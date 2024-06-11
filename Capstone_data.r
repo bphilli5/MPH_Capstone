@@ -191,4 +191,98 @@ summary(HOSPITAL_read_fit_1 <- glm(readmission_30days_recode_analysis~
                                    data=d_analysis,
                                    family = binomial))
 
+summary(HOSPITAL_ed_fit_1 <- glm(ed_30days_recode_analysis~
+                                     discharge_HOSPITAL_score+
+                                     payor_category_analysis+
+                                     sex_recode_analysis+
+                                     race_category_analysis+
+                                     ethnicity_recode_analysis+
+                                     language_category_analysis+
+                                     ICU_days_recode_analysis+
+                                     dc_disp_category_analysis+
+                                     age_at_encounter+
+                                     admission_HOSPITAL_score+
+                                     day_minus_2_HOSPITAL_score+
+                                     day_minus_1_HOSPITAL_score,
+                                   data=d_analysis,
+                                   family = binomial))
 
+summary(HOSPITAL_death_fit_1 <- glm(death_30_days_analysis~
+                                     discharge_HOSPITAL_score+
+                                     payor_category_analysis+
+                                     sex_recode_analysis+
+                                     race_category_analysis+
+                                     ethnicity_recode_analysis+
+                                     language_category_analysis+
+                                     ICU_days_recode_analysis+
+                                     dc_disp_category_analysis+
+                                     age_at_encounter+
+                                     admission_HOSPITAL_score+
+                                     day_minus_2_HOSPITAL_score+
+                                     day_minus_1_HOSPITAL_score,
+                                   data=d_analysis,
+                                   family = binomial))
+
+summary(NEWS_read_fit_1 <- glm(readmission_30days_recode_analysis~
+                                     discharge_news_score+
+                                     payor_category_analysis+
+                                     sex_recode_analysis+
+                                     race_category_analysis+
+                                     ethnicity_recode_analysis+
+                                     language_category_analysis+
+                                     ICU_days_recode_analysis+
+                                     dc_disp_category_analysis+
+                                     age_at_encounter+
+                                     admission_news_score+
+                                     day_minus_2_news_score+
+                                     day_minus_1_news_score,
+                                   data=d_analysis,
+                                   family = binomial))
+
+summary(NEWS_ed_fit_1 <- glm(ed_30days_recode_analysis~
+                                   discharge_news_score+
+                                   payor_category_analysis+
+                                   sex_recode_analysis+
+                                   race_category_analysis+
+                                   ethnicity_recode_analysis+
+                                   language_category_analysis+
+                                   ICU_days_recode_analysis+
+                                   dc_disp_category_analysis+
+                                   age_at_encounter+
+                                   admission_news_score+
+                                   day_minus_2_news_score+
+                                   day_minus_1_news_score,
+                                 data=d_analysis,
+                                 family = binomial))
+
+summary(NEWS_death_fit_1 <- glm(death_30_days_analysis~
+                                      discharge_HOSPITAL_score+
+                                      payor_category_analysis+
+                                      sex_recode_analysis+
+                                      race_category_analysis+
+                                      ethnicity_recode_analysis+
+                                      language_category_analysis+
+                                      ICU_days_recode_analysis+
+                                      dc_disp_category_analysis+
+                                      age_at_encounter+
+                                      admission_HOSPITAL_score+
+                                      day_minus_2_HOSPITAL_score+
+                                      day_minus_1_HOSPITAL_score,
+                                    data=d_analysis,
+                                    family = binomial))
+fits_1 <- c(HOSPITAL_read_fit_1,HOSPITAL_ed_fit_1,HOSPITAL_death_fit_1,
+            NEWS_read_fit_1,NEWS_ed_fit_1,NEWS_death_fit_1)
+
+HOSPITAL_read_fit_1_drop <- drop1(HOSPITAL_read_fit_1,test="LRT")
+HOSPITAL_ed_fit_1_drop <- drop1(HOSPITAL_ed_fit_1,test="LRT")
+HOSPITAL_death_fit_1_drop <- drop1(HOSPITAL_death_fit_1,test="LRT")
+NEWS_read_fit_1_drop <- drop1(NEWS_read_fit_1,test="LRT")
+NEWS_ed_fit_1_drop <- drop1(NEWS_ed_fit_1,test="LRT")
+NEWS_death_fit_1_drop <- drop1(NEWS_death_fit_1,test="LRT")
+
+drop1_table <- cbind(HOSPITAL_read_fit_1_drop$`Pr(>Chi)`,
+                       HOSPITAL_ed_fit_1_drop$`Pr(>Chi)`,
+                       HOSPITAL_death_fit_1_drop$`Pr(>Chi)`,
+                       NEWS_read_fit_1_drop$`Pr(>Chi)`,
+                       NEWS_ed_fit_1_drop$`Pr(>Chi)`,
+                       NEWS_death_fit_1_drop$`Pr(>Chi)`)
