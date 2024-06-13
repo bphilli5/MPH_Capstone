@@ -1,8 +1,15 @@
-# bphillips_capstone_aim1
-# Analysis related to the primary aim: determining the effect of insurance
-# status on the relationship between death/readmission risk and physiological scores
+###############################################################################
+#> bphillips_capstone_aim1
+#> Analysis related to the primary aim: determining the effect of insurance
+#> status on the relationship between death/readmission risk and physiological 
+#> scores.
+###############################################################################
 
-library(car)
+#> Step 1: Recoding and variable selection
+#> Step 2: Defining independent variables
+#> Step 3: Creating additive models
+#> Step 4: Purposeful selection of variables
+#> Step 5: Creating interactive models
 
 ###############################################################################
 # Step 1: Recoding to make R formatting happy and variable selection

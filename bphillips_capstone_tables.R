@@ -1,5 +1,13 @@
-# bphillips_capstone_tables
-# Creating descriptive statistics tables
+###############################################################################
+#> bphillips_capstone_tables
+#> Creating descriptive statistics tables
+###############################################################################
+
+#> Step 1: Variable recoding and selection
+#> Step 2: Sorting tables
+#> Step 3: Creating categorical variable table
+#> Step 4: Creating numeric variable table
+#> Step 5: ?????
 
 ###############################################################################
 # Step 1: Categorical variable recoding + variable selection 
