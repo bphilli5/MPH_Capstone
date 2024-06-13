@@ -4,6 +4,9 @@
 
 library(car)
 
+###############################################################################
+# Step 1: Recoding to make R formatting happy and variable selection
+###############################################################################
 d_analysis <- d_tables %>% 
   mutate(across(c(readmission_30days_recode,
                   ed_30days_recode,
@@ -40,6 +43,10 @@ d_analysis <- d_tables %>%
          discharge_HOSPITAL_score,
          discharge_news_score)
 
+###############################################################################
+# Step 2: Defining independent variables for HOSPITAL and NEWS models separately 
+###############################################################################
+
 hospital_variables <- data.frame(
   variable = c("discharge_HOSPITAL_score", 
                "payor_category_analysis", 
@@ -69,8 +76,9 @@ news_variables <- data.frame(
                "day_minus_2_news_score", 
                "day_minus_1_news_score")
 )
-
-# Create a list to store the model formulas
+###############################################################################
+# Step 3: Creating 6 models for the 3 endpoints and 2 scoring systems
+###############################################################################
 model_formulas <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
                           paste(hospital_variables$variable, collapse = " + ")),
@@ -90,37 +98,20 @@ fits_1 <- lapply(model_formulas, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
 
-# Perform drop1() on each model fit
+###############################################################################
+# Step 4: Purposeful variable selection
+###############################################################################
+
+# Step 4a: Type III testing
 drop1_list <- lapply(fits_1, function(fit) {
   drop1(fit, test = "LRT")
 })
 
-# Create the drop1_table using do.call() and cbind()
+# Creating a table of p-values from the Type III tests
 drop1_table <- do.call(cbind, lapply(drop1_list, function(x) x$`Pr(>Chi)`[-1]))
 
-# Define the row and column names separately and assign them to the drop1_table
-### TO DO: Move ordering last
-custom_order <- c("Discharge Scores",
-                  "Payor Category",
-                  "Day -1 Scores", 
-                  "Day -2 Scores",
-                  "Admission Scores",
-                  "Age",
-                  "Sex",
-                  "Race",
-                  "Ethnicity",
-                  "Primary Language",
-                  "Visited ICU",
-                  "Discharge Disposition")
-
-# Order the rows of drop1_table using dplyr functions
-drop1_table_ordered <- drop1_table %>%
-  as.data.frame() %>%
-  slice(match(custom_order, rownames(drop1_table))) %>%
-  as.matrix()
-
-# Simplify the ifelse() statements in the drop1_table_starred creation
-drop1_table_starred <- apply(drop1_table_ordered, 2, function(x) {
+# Including significance signifiers
+drop1_table_starred <- apply(drop1_table, 2, function(x) {
   case_when(
     x >= 0.1 ~ as.character(round(x, 3)),
     x >= 0.05 ~ paste0(round(x, 3), " -"),
@@ -130,6 +121,7 @@ drop1_table_starred <- apply(drop1_table_ordered, 2, function(x) {
   )
 })
 
+# Naming tables
 rownames(drop1_table_starred) <- c("Discharge Scores",
                                    "Payor Category",
                                    "Sex",
@@ -150,8 +142,10 @@ colnames(drop1_table_starred) <- c("HOSPITAL Readmission",
                                    "NEWS ED Visit",
                                    "NEWS Death")
 
+# View table
 view(drop1_table_starred)
 
+# Step 4b: Correlation matrices for HOSPITAL and NEWS scores
 news_subset <- d_analysis[, news_variables$variable]
 
 # Subset news_subset to include only numeric variables
@@ -161,6 +155,9 @@ news_numeric_subset <- news_subset[, news_numeric_vars]
 # Calculate the correlation matrix for news_numeric_subset
 news_correlation_matrix <- round(cor(news_numeric_subset, 
                                      use='pairwise.complete.obs'),3)
+
+# View NEWS correlation matrix
+view(news_correlation_matrix)
 
 hospital_subset <- d_analysis[, hospital_variables$variable]
 
@@ -174,12 +171,16 @@ hospital_correlation_matrix <- round(cor(hospital_numeric_subset,
 
 d_analysis_filtered <- subset(d_analysis, dc_disp_category_analysis != "Missing")
 
+# View HOSPITAL correlation matrix
+view(hospital_correlation_matrix)
+
 attributes(alias(fits_1[[1]])$Complete)$dimnames[[1]]
 
 vif(fits_1[[4]])
 
-
-######################################################################
+###############################################################################
+# Step 5: Fitting the interactive models
+###############################################################################
 
 model_formulas_i <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ discharge_HOSPITAL_score * ",

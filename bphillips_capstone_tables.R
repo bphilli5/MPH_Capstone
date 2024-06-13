@@ -1,22 +1,11 @@
 # bphillips_capstone_tables
-# Creating descriptive statistics figures
+# Creating descriptive statistics tables
 
-library(tidyverse)
-library(haven)
+###############################################################################
+# Step 1: Categorical variable recoding + variable selection 
+###############################################################################
 
-# Question 1: how do I want to represent percentages? row total vs. column total
-# vs. overall total %?
-
-# Reading data files
-setwd("S:/HMG-Capstone-Phillips/Data")
-d_sas <- read_sas("dedup_pt_encounters_eci_analysis.sas7bdat")
-
-setwd("C:/Users/brend/OneDrive/Documents/MPH_Capstone")
-write.csv(d_sas, file = "capstone_data.csv", row.names = FALSE)
-
-d_csv <- read.csv("capstone_data.csv")
-
-d_tables <- d_csv %>% 
+d_tables <- d_sas %>% 
   mutate(across(c(ed_30days,
                   readmission_30days),
                 ~recode(.,"N"="No","Y"="Yes",.default=NULL),
@@ -52,8 +41,10 @@ d_tables <- d_csv %>%
          discharge_HOSPITAL_score,
          discharge_news_score)
 
-# Creating descriptive statistics tables
-# First, setting up the sorting of the tables
+###############################################################################
+# Step 2: Setting up the sorting of the tables
+###############################################################################
+
 table_variable_order <- c("readmission_30days_recode",
                           "ed_30days_recode",
                           "death_30_days",
@@ -104,6 +95,9 @@ table_value_order <- c("Yes",
                        "Unknown",
                        "Missing")
 
+###############################################################################
+# Step 3: Creating the categorical variable table
+###############################################################################
 
 categorical_table <- d_tables %>% 
   select(readmission_30days_recode,
@@ -124,12 +118,16 @@ categorical_table <- d_tables %>%
   mutate(
     total = sum(count),
     percentage = round(count / total * 100, 1),
-    result = paste0(count, " (", percentage, "%)")
-  ) %>%
+    result = paste0(count, " (", percentage, "%)")) %>%
   select(-count, -total, -percentage) %>%
-  pivot_wider(names_from = payor_category, values_from = result, values_fill = "0 (0%)") %>%
+  pivot_wider(names_from = payor_category, 
+              values_from = result, values_fill = "0 (0%)") %>%
   arrange(match(variable, table_variable_order), 
           match(value, table_value_order))
+
+###############################################################################
+# Step 4: Creating the numeric variable table
+###############################################################################
 
 numeric_table <- d_tables %>% 
   select(payor_category,
@@ -150,20 +148,10 @@ numeric_table <- d_tables %>%
   ) %>% 
   mutate(result = paste0(mean, " (", sd, ")")) %>% 
   select(-mean, -sd) %>% 
-  pivot_wider(names_from = payor_category, values_from = result, values_fill = "0 (0)")
+  pivot_wider(names_from = payor_category, 
+              values_from = result, values_fill = "0 (0)")
 
+# View tables
 view(categorical_table)
 view(numeric_table)
 
-result <- lapply(d_tables, function(column) {
-  if (is.numeric(column)) {
-    mean_val <- round(mean(column, na.rm = TRUE), 1)
-    sd_val <- round(sd(column, na.rm = TRUE), 1)
-    paste0(mean_val, " (", sd_val, ")")
-  } else {
-    count_val <- table(column)
-    total <- sum(count_val)
-    percentage_val <- round(count_val / total * 100, 1)
-    paste0(count_val, " (", percentage_val, "%)")
-  }
-})
