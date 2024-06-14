@@ -7,9 +7,10 @@
 
 #> Step 1: Recoding and variable selection
 #> Step 2: Defining independent variables
-#> Step 3: Creating additive models
-#> Step 4: Purposeful selection of variables
-#> Step 5: Creating interactive models
+#> Step 3: Bivariate analysis TODO
+#> Step 4: Creating additive models
+#> Step 5: Purposeful selection of variables
+#> Step 6: Creating interactive models TODO
 
 ###############################################################################
 # Step 1: Recoding to make R formatting happy and variable selection
@@ -26,13 +27,16 @@ d_analysis <- d_tables %>%
                    ethnicity_recode,
                    language_category,
                    ICU_days_recode,
-                   dc_disp_category),
+                   dc_disp_category,
+                   discharge_service,
+                   facility_name),
                  ~factor(.),
                  .names="{.col}_analysis"))) %>% 
   
   select(readmission_30days_recode_analysis,
          ed_30days_recode_analysis,
          death_30_days_analysis,
+         
          payor_category_analysis,
          sex_recode_analysis,
          race_category_analysis,
@@ -40,7 +44,11 @@ d_analysis <- d_tables %>%
          language_category_analysis,
          ICU_days_recode_analysis,
          dc_disp_category_analysis,
+         discharge_service_analysis,
+         facility_name_analysis,
+         
          age_at_encounter,
+         
          admission_HOSPITAL_score,
          admission_news_score,
          day_minus_2_HOSPITAL_score,
@@ -51,8 +59,26 @@ d_analysis <- d_tables %>%
          discharge_news_score)
 
 ###############################################################################
-# Step 2: Defining independent variables for HOSPITAL and NEWS models separately 
+# Step 2: Defining predictor variables for HOSPITAL and NEWS models 
 ###############################################################################
+predictors <- c("discharge_HOSPITAL_score",
+                "discharge_news_score",
+                "payor_category_analysis", 
+                "sex_recode_analysis",
+                "race_category_analysis", 
+                "ethnicity_recode_analysis", 
+                "language_category_analysis",
+                "ICU_days_recode_analysis", 
+                "dc_disp_category_analysis",
+                "discharge_service_analysis",
+                "facility_name_analysis",
+                "age_at_encounter",
+                "admission_HOSPITAL_score", 
+                "day_minus_2_HOSPITAL_score", 
+                "day_minus_1_HOSPITAL_score",
+                "admission_news_score", 
+                "day_minus_2_news_score", 
+                "day_minus_1_news_score")
 
 hospital_variables <- data.frame(
   variable = c("discharge_HOSPITAL_score", 
@@ -63,6 +89,8 @@ hospital_variables <- data.frame(
                "language_category_analysis",
                "ICU_days_recode_analysis", 
                "dc_disp_category_analysis", 
+               "discharge_service_analysis",
+               "facility_name_analysis",
                "age_at_encounter",
                "admission_HOSPITAL_score", 
                "day_minus_2_HOSPITAL_score", 
@@ -70,7 +98,7 @@ hospital_variables <- data.frame(
 )
 
 news_variables <- data.frame(
-  variable = c("discharge_news_score", 
+  variable = c("discharge_HOSPITAL_score",
                "payor_category_analysis", 
                "sex_recode_analysis",
                "race_category_analysis", 
@@ -78,13 +106,34 @@ news_variables <- data.frame(
                "language_category_analysis",
                "ICU_days_recode_analysis", 
                "dc_disp_category_analysis", 
+               "discharge_service_analysis",
+               "facility_name_analysis",
                "age_at_encounter",
                "admission_news_score", 
                "day_minus_2_news_score", 
                "day_minus_1_news_score")
 )
+
 ###############################################################################
-# Step 3: Creating 6 models for the 3 endpoints and 2 scoring systems
+# Step 3: Bivariate analysis
+###############################################################################
+bivariate_glm <- function(data, outcome, predictors) {
+  results <- list()
+  for (predictor in predictors) {
+    formula <- as.formula(paste(outcome, "~", predictor))
+    model <- glm(formula, data = data, family = binomial)
+    results[[predictor]] <- summary(model)
+  }
+  return(results)
+}
+
+# Perform bivariate GLM analysis for each outcome
+readmission_results <- bivariate_glm(d_analysis, "readmission_30days_recode_analysis", predictors)
+ed_results <- bivariate_glm(d_analysis, "ed_30days_recode_analysis", predictors)
+death_results <- bivariate_glm(d_analysis, "death_30_days_analysis", predictors)
+
+###############################################################################
+# Step 4: Creating 6 models for the 3 endpoints and 2 scoring systems
 ###############################################################################
 model_formulas <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
@@ -106,10 +155,10 @@ fits_1 <- lapply(model_formulas, function(formula) {
 })
 
 ###############################################################################
-# Step 4: Purposeful variable selection
+# Step 5: Purposeful variable selection
 ###############################################################################
 
-# Step 4a: Type III testing
+# Step 5a: Type III testing
 drop1_list <- lapply(fits_1, function(fit) {
   drop1(fit, test = "LRT")
 })
@@ -137,6 +186,8 @@ rownames(drop1_table_starred) <- c("Discharge Scores",
                                    "Primary Language",
                                    "Visited ICU",
                                    "Discharge Disposition",
+                                   "Discharge Service",
+                                   "Facility Name",
                                    "Age",
                                    "Admission Scores",
                                    "Day -1 Scores",
@@ -152,7 +203,7 @@ colnames(drop1_table_starred) <- c("HOSPITAL Readmission",
 # View table
 view(drop1_table_starred)
 
-# Step 4b: Correlation matrices for HOSPITAL and NEWS scores
+# Step 5b: Correlation matrices for HOSPITAL and NEWS scores
 news_subset <- d_analysis[, news_variables$variable]
 
 # Subset news_subset to include only numeric variables
@@ -186,7 +237,7 @@ attributes(alias(fits_1[[1]])$Complete)$dimnames[[1]]
 vif(fits_1[[4]])
 
 ###############################################################################
-# Step 5: Fitting the interactive models
+# Step 6: Fitting the interactive models
 ###############################################################################
 
 model_formulas_i <- list(
@@ -230,7 +281,9 @@ custom_order_i <- c("Discharge Scores",
                   "Ethnicity",
                   "Primary Language",
                   "Visited ICU",
-                  "Discharge Disposition")
+                  "Discharge Disposition",
+                  "Discharge Service",
+                  "Facility Name")
 
 # Order the rows of drop1_table using dplyr functions
 drop1_table_ordered_i <- drop1_table_i %>%
@@ -257,6 +310,8 @@ rownames(drop1_table_starred_i) <- c("Discharge Scores",
                                    "Primary Language",
                                    "Visited ICU",
                                    "Discharge Disposition",
+                                   "Discharge Service",
+                                   "Facility Name",
                                    "Age",
                                    "Admission Scores",
                                    "Day -1 Scores",

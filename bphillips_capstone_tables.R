@@ -7,13 +7,13 @@
 #> Step 2: Sorting tables
 #> Step 3: Creating categorical variable table
 #> Step 4: Creating numeric variable table
-#> Step 5: ?????
+#> Step 5: Overall figures TODO
 
 ###############################################################################
 # Step 1: Categorical variable recoding + variable selection 
 ###############################################################################
 
-d_tables <- d_sas %>% 
+d_tables <- d_csv %>% 
   mutate(across(c(ed_30days,
                   readmission_30days),
                 ~recode(.,"N"="No","Y"="Yes",.default=NULL),
@@ -31,6 +31,7 @@ d_tables <- d_sas %>%
   select(readmission_30days_recode,
          ed_30days_recode,
          death_30_days,
+         
          payor_category,
          sex_recode,
          race_category,
@@ -38,7 +39,10 @@ d_tables <- d_sas %>%
          language_category,
          ICU_days_recode,
          dc_disp_category,
-         payor_category,
+         discharge_service,
+         patient_class,
+         facility_name,
+         
          age_at_encounter,
          admission_HOSPITAL_score,
          admission_news_score,
@@ -53,26 +57,29 @@ d_tables <- d_sas %>%
 # Step 2: Setting up the sorting of the tables
 ###############################################################################
 
-table_variable_order <- c("readmission_30days_recode",
-                          "ed_30days_recode",
-                          "death_30_days",
-                          
-                          "age_at_encounter",
-                          "sex_recode",
-                          "race_category",
-                          "ethnicity_recode",
-                          "language_category",
-                          "ICU_days_recode",
-                          "dc_disp_category",
-                          
-                          "discharge_HOSPITAL_score",
-                          "day_minus_1_HOSPITAL_score",
-                          "day_minus_2_HOSPITAL_score",
-                          "admission_HOSPITAL_score",
-                          "discharge_news_score",
-                          "day_minus_1_news_score",
-                          "day_minus_2_news_score",
-                          "admission_news_score")
+variables_ordered <- c("readmission_30days_recode",
+                       "ed_30days_recode",
+                       "death_30_days",
+                       
+                       "age_at_encounter",
+                       "sex_recode",
+                       "race_category",
+                       "ethnicity_recode",
+                       "language_category",
+                       "ICU_days_recode",
+                       "dc_disp_category",
+                       "discharge_service",
+                       "patient_class",
+                       "facility_name",
+                       
+                       "discharge_HOSPITAL_score",
+                       "day_minus_1_HOSPITAL_score",
+                       "day_minus_2_HOSPITAL_score",
+                       "admission_HOSPITAL_score",
+                       "discharge_news_score",
+                       "day_minus_1_news_score",
+                       "day_minus_2_news_score",
+                       "admission_news_score")
 
 table_value_order <- c("Yes",
                        "No",
@@ -99,6 +106,10 @@ table_value_order <- c("Yes",
                        "Male",                                    
                        "Female",
                        
+                       "Medicine",
+                       "Orthopedics",
+                       "Surgery",
+                       
                        "Other",
                        "Unknown",
                        "Missing")
@@ -117,7 +128,10 @@ categorical_table <- d_tables %>%
          ethnicity_recode,
          language_category,
          ICU_days_recode,
-         dc_disp_category) %>%
+         dc_disp_category,
+         discharge_service,
+         patient_class,
+         facility_name) %>%
   
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
   group_by(payor_category, variable, value) %>% 
