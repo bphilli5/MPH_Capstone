@@ -16,7 +16,9 @@
 d_tables <- d_csv %>% 
   mutate(across(c(ed_30days,
                   readmission_30days),
-                ~recode(.,"N"="No","Y"="Yes",.default=NULL),
+                ~case_when(.=="N" ~ "No",
+                           .=="Y" ~ "Yes",
+                           .default=NULL),
                 .names="{.col}_recode"),
          sex_recode = ifelse(sex == "", "Unknown", sex),
          ethnicity_recode = case_when(
