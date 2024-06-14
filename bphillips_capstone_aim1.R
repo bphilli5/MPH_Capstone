@@ -19,7 +19,10 @@ d_analysis <- d_tables %>%
   mutate(across(c(readmission_30days_recode,
                   ed_30days_recode,
                   death_30_days),
-                ~recode(.,"No"=0,"Yes"=1,.default=NULL),
+                ~case_when(
+                  .== "No" ~ 0,
+                  .== "Yes" ~ 1,
+                  .default=NULL),
                 .names="{.col}_analysis"),
          (across(c(payor_category,
                    sex_recode,
