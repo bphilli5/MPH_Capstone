@@ -27,33 +27,41 @@ d_tables <- d_csv %>%
            ethnicity == "Patient Unable to Answer" ~ "Unknown",
            ethnicity == "*Unspecified" ~ "Unknown",
            ethnicity == "" ~ "Unknown",
-           TRUE ~ ethnicity),
-         ICU_days_recode = ifelse(ICU_days == "","No", "Yes")) %>% 
+           TRUE ~ ethnicity)) %>% 
   
-  select(readmission_30days_recode,
-         ed_30days_recode,
-         death_30_days,
-         
-         payor_category,
-         sex_recode,
-         race_category,
-         ethnicity_recode,
-         language_category,
-         ICU_days_recode,
-         dc_disp_category,
-         discharge_service,
-         patient_class,
-         facility_name,
-         
-         age_at_encounter,
-         admission_HOSPITAL_score,
-         admission_news_score,
-         day_minus_2_HOSPITAL_score,
-         day_minus_1_HOSPITAL_score,
-         day_minus_1_news_score,
-         day_minus_2_news_score,
-         discharge_HOSPITAL_score,
-         discharge_news_score)
+  select(
+    # Outcomes
+    readmission_30days_recode,
+    ed_30days_recode,
+    death_30_days,
+    # Scores
+    discharge_HOSPITAL_score,
+    discharge_news_score,
+    admission_HOSPITAL_score,
+    admission_news_score,
+    day_minus_2_HOSPITAL_score,
+    day_minus_1_HOSPITAL_score,
+    day_minus_1_news_score,
+    day_minus_2_news_score,
+    average_HOSPITAL_score,
+    average_NEWS_score,
+    # Categorical predictors
+    payor_category,
+    sex_recode,
+    race_category,
+    ethnicity_recode,
+    language_category,
+    ICU_category,
+    dc_disp_category,
+    discharge_service,
+    patient_class,
+    facility_name,
+    # Numeric predictors
+    age_at_encounter,
+    log_los_in_hours,
+    CMR_Index_Readmission,
+    CMR_Index_Mortality
+    )
 
 ###############################################################################
 # Step 2: Setting up the sorting of the tables
@@ -68,20 +76,25 @@ variables_ordered <- c("readmission_30days_recode",
                        "race_category",
                        "ethnicity_recode",
                        "language_category",
-                       "ICU_days_recode",
+                       "ICU_category",
                        "dc_disp_category",
                        "discharge_service",
                        "patient_class",
                        "facility_name",
+                       "log_los_in_hours",
+                       "CMR_Index_Readmission",
+                       "CMR_Index_Mortality",
                        
                        "discharge_HOSPITAL_score",
                        "day_minus_1_HOSPITAL_score",
                        "day_minus_2_HOSPITAL_score",
                        "admission_HOSPITAL_score",
+                       "average_HOSPITAL_score",
                        "discharge_news_score",
                        "day_minus_1_news_score",
                        "day_minus_2_news_score",
-                       "admission_news_score")
+                       "admission_news_score",
+                       "average_NEWS_score")
 
 table_value_order <- c("Yes",
                        "No",
@@ -129,7 +142,7 @@ categorical_table <- d_tables %>%
          race_category,
          ethnicity_recode,
          language_category,
-         ICU_days_recode,
+         ICU_category,
          dc_disp_category,
          discharge_service,
          patient_class,
@@ -146,7 +159,7 @@ categorical_table <- d_tables %>%
   select(-count, -total, -percentage) %>%
   pivot_wider(names_from = payor_category, 
               values_from = result, values_fill = "0 (0%)") %>%
-  arrange(match(variable, table_variable_order), 
+  arrange(match(variable, variables_ordered), 
           match(value, table_value_order))
 
 ###############################################################################
@@ -163,7 +176,10 @@ numeric_table <- d_tables %>%
          day_minus_1_news_score,
          day_minus_2_news_score,
          discharge_HOSPITAL_score,
-         discharge_news_score) %>% 
+         discharge_news_score,
+         log_los_in_hours,
+         CMR_Index_Readmission,
+         CMR_Index_Mortality) %>% 
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
   group_by(payor_category, variable) %>% 
   summarise(

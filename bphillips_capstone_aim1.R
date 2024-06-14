@@ -29,92 +29,80 @@ d_analysis <- d_tables %>%
                    race_category,
                    ethnicity_recode,
                    language_category,
-                   ICU_days_recode,
+                   ICU_category,
                    dc_disp_category,
                    discharge_service,
+                   patient_class,
                    facility_name),
                  ~factor(.),
                  .names="{.col}_analysis"))) %>% 
   
-  select(readmission_30days_recode_analysis,
-         ed_30days_recode_analysis,
-         death_30_days_analysis,
-         
-         payor_category_analysis,
-         sex_recode_analysis,
-         race_category_analysis,
-         ethnicity_recode_analysis,
-         language_category_analysis,
-         ICU_days_recode_analysis,
-         dc_disp_category_analysis,
-         discharge_service_analysis,
-         facility_name_analysis,
-         
-         age_at_encounter,
-         
-         admission_HOSPITAL_score,
-         admission_news_score,
-         day_minus_2_HOSPITAL_score,
-         day_minus_1_HOSPITAL_score,
-         day_minus_1_news_score,
-         day_minus_2_news_score,
-         discharge_HOSPITAL_score,
-         discharge_news_score)
+  select(
+    # Outcomes
+    readmission_30days_recode_analysis,
+    ed_30days_recode_analysis,
+    death_30_days_analysis,
+    # Scores
+    discharge_HOSPITAL_score,
+    discharge_news_score,
+    day_minus_1_HOSPITAL_score,
+    day_minus_1_news_score,
+    day_minus_2_HOSPITAL_score,
+    day_minus_2_news_score,
+    admission_HOSPITAL_score,
+    admission_news_score,
+    average_HOSPITAL_score,
+    average_NEWS_score,
+    # Categorical predictors
+    payor_category_analysis,
+    sex_recode_analysis,
+    race_category_analysis,
+    ethnicity_recode_analysis,
+    language_category_analysis,
+    ICU_category_analysis,
+    dc_disp_category_analysis,
+    discharge_service_analysis,
+    patient_class_analysis,
+    facility_name_analysis,
+    # Numeric predictors
+    age_at_encounter,
+    log_los_in_hours,
+    CMR_Index_Readmission,
+    CMR_Index_Mortality
+         ) %>% 
+  
+  drop_na(
+    # Categorical predictors
+    payor_category_analysis,
+    sex_recode_analysis,
+    race_category_analysis,
+    ethnicity_recode_analysis,
+    language_category_analysis,
+    ICU_category_analysis,
+    dc_disp_category_analysis,
+    discharge_service_analysis,
+    patient_class_analysis,
+    facility_name_analysis,
+    # Numeric predictors
+    age_at_encounter,
+    log_los_in_hours,
+    CMR_Index_Readmission,
+    CMR_Index_Mortality)
 
 ###############################################################################
 # Step 2: Defining predictor variables for HOSPITAL and NEWS models 
 ###############################################################################
-predictors <- c("discharge_HOSPITAL_score",
-                "discharge_news_score",
-                "payor_category_analysis", 
-                "sex_recode_analysis",
-                "race_category_analysis", 
-                "ethnicity_recode_analysis", 
-                "language_category_analysis",
-                "ICU_days_recode_analysis", 
-                "dc_disp_category_analysis",
-                "discharge_service_analysis",
-                "facility_name_analysis",
-                "age_at_encounter",
-                "admission_HOSPITAL_score", 
-                "day_minus_2_HOSPITAL_score", 
-                "day_minus_1_HOSPITAL_score",
-                "admission_news_score", 
-                "day_minus_2_news_score", 
-                "day_minus_1_news_score")
-
+all_variables <- names(d_analysis)
+outcome_variables <- names(d_analysis)[1:3]
+score_variables <- names(d_analysis)[4:13]
+predictors <- names(d_analysis)[14:length(d_analysis)]
 hospital_variables <- data.frame(
-  variable = c("discharge_HOSPITAL_score", 
-               "payor_category_analysis", 
-               "sex_recode_analysis",
-               "race_category_analysis", 
-               "ethnicity_recode_analysis", 
-               "language_category_analysis",
-               "ICU_days_recode_analysis", 
-               "dc_disp_category_analysis", 
-               "discharge_service_analysis",
-               "facility_name_analysis",
-               "age_at_encounter",
-               "admission_HOSPITAL_score", 
-               "day_minus_2_HOSPITAL_score", 
-               "day_minus_1_HOSPITAL_score")
+  variable = c(score_variables[1],
+               predictors)
 )
-
 news_variables <- data.frame(
-  variable = c("discharge_HOSPITAL_score",
-               "payor_category_analysis", 
-               "sex_recode_analysis",
-               "race_category_analysis", 
-               "ethnicity_recode_analysis", 
-               "language_category_analysis",
-               "ICU_days_recode_analysis", 
-               "dc_disp_category_analysis", 
-               "discharge_service_analysis",
-               "facility_name_analysis",
-               "age_at_encounter",
-               "admission_news_score", 
-               "day_minus_2_news_score", 
-               "day_minus_1_news_score")
+  variable = c(score_variables[2],
+               predictors)
 )
 
 ###############################################################################
@@ -125,15 +113,28 @@ bivariate_glm <- function(data, outcome, predictors) {
   for (predictor in predictors) {
     formula <- as.formula(paste(outcome, "~", predictor))
     model <- glm(formula, data = data, family = binomial)
-    results[[predictor]] <- summary(model)
+    results[[predictor]] <- tidy(model)[-1,c(1,2,5)]
   }
   return(results)
 }
 
 # Perform bivariate GLM analysis for each outcome
-readmission_results <- bivariate_glm(d_analysis, "readmission_30days_recode_analysis", predictors)
-ed_results <- bivariate_glm(d_analysis, "ed_30days_recode_analysis", predictors)
-death_results <- bivariate_glm(d_analysis, "death_30_days_analysis", predictors)
+readmission_results <- bivariate_glm(d_analysis, 
+                                     outcome_variables[1], 
+                                     c(score_variables,predictors))
+ed_results <- bivariate_glm(d_analysis,
+                            outcome_variables[2], 
+                            c(score_variables,predictors))
+death_results <- bivariate_glm(d_analysis, 
+                               outcome_variables[3], 
+                               c(score_variables,predictors))
+
+view(readmission_table <- do.call(rbind, readmission_results) %>% 
+       mutate(across(where(is.numeric), round, 3)))
+view(ed_table <- do.call(rbind, ed_results) %>% 
+       mutate(across(where(is.numeric), round, 3)))
+view(death_table <- do.call(rbind, death_results) %>% 
+       mutate(across(where(is.numeric), round, 3)))
 
 ###############################################################################
 # Step 4: Creating 6 models for the 3 endpoints and 2 scoring systems

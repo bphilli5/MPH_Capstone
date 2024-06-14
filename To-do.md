@@ -1,10 +1,6 @@
 Overall
 - Consider additional covariates
-  - hospital_service
-  - log_los_in_hours
-  
-- Decide how to deal with missings
-- ICU_days -> ICU_category
+  - hospital_service???
 
 Tables
 - Add n to descriptive tables
@@ -13,7 +9,6 @@ Tables
 - Rename rows
 
 Aim 1
-- Develop table for bivariate analysis results
 - Fit interactive models
 - Adjust for colinearity of scores
 - Move ordering to final step of drop1 tables
@@ -25,6 +20,7 @@ Aim 2
 
 
 Questions
-- How was missing data handled?
-- How were confounders selected for the final models?
-- Variable review
+- Interpreting bivariate analysis results
+- Merits of using multiple score inputs
+- Modeling indexes as categorical vs. numeric
+  - CMR_Indices are >80% 0s
