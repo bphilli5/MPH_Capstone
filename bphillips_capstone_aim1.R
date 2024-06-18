@@ -110,7 +110,7 @@ news_variables <- data.frame(
 ###############################################################################
 # Step 3: Bivariate analysis
 ###############################################################################
-# Function to produce bivariate regression results  for given outcome and predictors
+# Function to produce bivariate regression results  for outcomes and predictors
 bivariate_glm <- function(data, outcome, predictors) {
   results <- list()
   for (predictor in predictors) {
@@ -153,8 +153,9 @@ plot_linear_association <- function(data, outcome, predictors) {
       pi <- pmax(pmin(loessfit,0.9999),0.0001)
       logitfitted <- logit(pi)
       o <- order(data[[predictor]])
-      results$plot_data[[predictor]] <- data.frame(x = data[[predictor]][o], y = logitfitted[o])
-      plot <- ggplot(results$plot_data, aes(x = x, y = y)) +
+      plot_data <- data.frame(x = data[[predictor]][o],
+                                                   y = logitfitted[o])
+      plot <- ggplot(plot_data, aes(x = x, y = y)) +
         geom_line() +
         labs(x = predictor)
       results[[predictor]] <- plot
@@ -172,15 +173,60 @@ readmission_plot_grid <- grid.arrange(grobs=readmission_plots,
 ed_plots <- plot_linear_association(d_analysis,
                                     outcome_variables[2],
                                     predictors)
-ed_plot_grid <- grid.arrange(grobs=readmission_plots, 
+ed_plot_grid <- grid.arrange(grobs=ed_plots, 
                              top="30-Day ED Readmission")
 
 death_plots <- plot_linear_association(d_analysis,
                                        outcome_variables[3],
                                        predictors)
-death_plot_grid <- grid.arrange(grobs=readmission_plots, 
+death_plot_grid <- grid.arrange(grobs=death_plots, 
                                 top="30-Day Death")
 
+# Testing score variables
+readmission_plots <- plot_linear_association(d_analysis,
+                                             outcome_variables[1],
+                                             c(score_variables, predictors))
+readmission_plot_grid <- grid.arrange(grobs=readmission_plots, 
+                                      top="30-Day Readmission")
+
+# Log transformations
+plot_log_association <- function(data, outcome, predictors) {
+  results <- list()
+  logit <- function(pr) log(pr/(1-pr))
+  for (predictor in predictors) {
+    if (is.numeric(data[[predictor]]) && all(data[[predictor]] >= 0)) {
+      data[[predictor]] <- log(data[[predictor]])
+      loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
+      pi <- pmax(pmin(loessfit,0.9999),0.0001)
+      logitfitted <- logit(pi)
+      o <- order(data[[predictor]])
+      plot_data <- data.frame(x = data[[predictor]][o],
+                              y = logitfitted[o])
+      plot <- ggplot(plot_data, aes(x = x, y = y)) +
+        geom_line() +
+        labs(x = predictor)
+      results[[predictor]] <- plot
+    }
+  }
+  return(results)
+}
+readmission_log_plots <- plot_log_association(d_analysis,
+                                             outcome_variables[1],
+                                             predictors)
+readmission_log_plot_grid <- grid.arrange(grobs=readmission_log_plots, 
+                                      top="30-Day Readmission - Log")
+
+ed_log_plots <- plot_log_association(d_analysis,
+                                     outcome_variables[2],
+                                     predictors)
+ed_log_plot_grid <- grid.arrange(grobs=ed_log_plots, 
+                                 top="30-Day ED Readmission - Log")
+
+death_log_plots <- plot_log_association(d_analysis,
+                                        outcome_variables[3],
+                                        predictors)
+death_log_plot_grid <- grid.arrange(grobs=death_log_plots, 
+                                    top="30-Day Death - Log")
 ###############################################################################
 # Step 4: Collinearity of numeric predictors
 ###############################################################################
@@ -306,10 +352,7 @@ table_column_names <- c("HOSPITAL Readmission",
                         "NEWS Death")
 
 rownames(drop1_table_starred_1) <- table_row_names[-16]
-
 colnames(drop1_table_starred_1) <- table_column_names
-
-# View table
 view(drop1_table_starred_1)
 
 # Interatctive model Type III testing
@@ -333,8 +376,12 @@ drop1_table_starred_i <- apply(drop1_table_i, 2, function(x) {
 })
 
 rownames(drop1_table_starred_i) <- table_row_names[3:length(table_row_names)]
-
 colnames(drop1_table_starred_i) <- table_column_names
-
 view(drop1_table_starred_i)
 
+###
+# VIFs
+###
+fit_1_vifs <- lapply(fits_1, function(x) vif(x))
+
+fit_i_vifs <- lapply(fits_i, function(x) vif(x))
