@@ -56,8 +56,7 @@
 "dx2"
 "poa1"
 "poa2"
-"I10_NDX"
-"line"
+"line" "I10_NDX"
 "lag"
         
         

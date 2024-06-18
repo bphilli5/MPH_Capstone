@@ -13,7 +13,7 @@
 # Step 1: Categorical variable recoding + variable selection 
 ###############################################################################
 
-d_tables <- d_csv %>% 
+d_tables <- d_sas %>% 
   mutate(across(c(ed_30days,
                   readmission_30days),
                 ~case_when(.=="N" ~ "No",
@@ -58,7 +58,7 @@ d_tables <- d_csv %>%
     facility_name,
     # Numeric predictors
     age_at_encounter,
-    log_los_in_hours,
+    los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
     )
@@ -81,7 +81,7 @@ variables_ordered <- c("readmission_30days_recode",
                        "discharge_service",
                        "patient_class",
                        "facility_name",
-                       "log_los_in_hours",
+                       "los_in_hours",
                        "CMR_Index_Readmission",
                        "CMR_Index_Mortality",
                        
@@ -177,7 +177,7 @@ numeric_table <- d_tables %>%
          day_minus_2_news_score,
          discharge_HOSPITAL_score,
          discharge_news_score,
-         log_los_in_hours,
+         los_in_hours,
          CMR_Index_Readmission,
          CMR_Index_Mortality) %>% 
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
@@ -194,4 +194,3 @@ numeric_table <- d_tables %>%
 # View tables
 view(categorical_table)
 view(numeric_table)
-
