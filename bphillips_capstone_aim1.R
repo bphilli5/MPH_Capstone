@@ -143,30 +143,54 @@ view(death_table <- do.call(rbind, death_results) %>%
 ###############################################################################
 # Step 4: Plotting of numeric predictors and outcomes
 ###############################################################################
-# Subset data
-news_subset <- d_analysis[, news_variables$variable]
-news_numeric_vars <- sapply(news_subset, is.numeric)
-news_numeric_subset <- names(news_subset[, news_numeric_vars])
+# Function to iterate over predictors and plot numerics against outcomes
+plot_linear_association <- function(data, outcome, predictors) {
+  results <- list()
+  logit <- function(pr) log(pr/(1-pr))
+  for (predictor in predictors) {
+    if (is.numeric(data[[predictor]])) {
+      loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
+      pi <- pmax(pmin(loessfit,0.9999),0.0001)
+      logitfitted <- logit(pi)
+      o <- order(data[[predictor]])
+      results$plot_data[[predictor]] <- data.frame(x = data[[predictor]][o], y = logitfitted[o])
+      plot <- ggplot(results$plot_data, aes(x = x, y = y)) +
+        geom_line() +
+        labs(x = predictor)
+      results[[predictor]] <- plot
+    }
+  }
+  return(results)
+}
 
-# Subset data
-hospital_subset <- d_analysis[, hospital_variables$variable]
-hospital_numeric_vars <- sapply(hospital_subset, is.numeric)
-hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
+readmission_plots <- plot_linear_association(d_analysis,
+                                             outcome_variables[1],
+                                             predictors)
+readmission_plot_grid <- grid.arrange(grobs=readmission_plots, 
+                                      top="30-Day Readmission")
 
-# for (predictor in predictors) {
-#   if (is.numeric(data[[predictor]])) {
-#     logit <- function(pr) log(pr/(1-pr))
-#     loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
-#     pi <- pmax(pmin(loessfit,0.9999),0.0001)
-#     logitfitted <- logit(pi)
-#     o <- order(data[[predictor]])
-#     results$plot[[predictor]] <- plot(data[[predictor]][o],logitfitted[o],type="l")
-# }
+ed_plots <- plot_linear_association(d_analysis,
+                                    outcome_variables[2],
+                                    predictors)
+ed_plot_grid <- grid.arrange(grobs=readmission_plots, 
+                             top="30-Day ED Readmission")
+
+death_plots <- plot_linear_association(d_analysis,
+                                       outcome_variables[3],
+                                       predictors)
+death_plot_grid <- grid.arrange(grobs=readmission_plots, 
+                                top="30-Day Death")
+
 ###############################################################################
 # Step 4: Collinearity of numeric predictors
 ###############################################################################
 
 # NEWS model collinearity
+# Subset data
+news_subset <- d_analysis[, news_variables$variable]
+news_numeric_vars <- sapply(news_subset, is.numeric)
+news_numeric_subset <- names(news_subset[, news_numeric_vars])
+
 # Calculate the correlation matrix for news_numeric_subset
 news_correlation_matrix <- round(cor(news_numeric_subset, 
                                      use='pairwise.complete.obs'),3)
@@ -175,6 +199,11 @@ news_correlation_matrix <- round(cor(news_numeric_subset,
 view(news_correlation_matrix)
 
 # HOSPITAL model collinearity
+# Subset data
+hospital_subset <- d_analysis[, hospital_variables$variable]
+hospital_numeric_vars <- sapply(hospital_subset, is.numeric)
+hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
+
 # Calculate the correlation matrix for hospital_numeric_subset
 hospital_correlation_matrix <- round(cor(hospital_numeric_subset, 
                                          use='pairwise.complete.obs'),3)
