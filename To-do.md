@@ -1,7 +1,6 @@
 Overall
 - Consider additional covariates
   - hospital_service???
-- Hospital LOS as outcome
 
 Tables
 - Add n to descriptive tables
@@ -9,9 +8,7 @@ Tables
 - Excel final output
 
 Aim 1
-- Fit interactive models
 - Adjust for colinearity of scores
-- Move ordering to final step of drop1 tables
 - Test for confounding from variables for removal
 - Figure out vif()
 
