@@ -7,13 +7,15 @@
 
 #> Step 1: Recoding and variable selection
 #> Step 2: Defining independent variables
-#> Step 3: Bivariate analysis TODO
-#> Step 4: Creating additive models
-#> Step 5: Purposeful selection of variables
-#> Step 6: Creating interactive models TODO
+#> Step 3: Bivariate analysis
+#> Step 4: Collinearity of numeric predictors
+#> Step 5: Plotting of numeric predictors and outcomes
+#> Step 6: Creating simple additive models
+#> Step 7: Creating simple interaction models
+#> Step 8: Type III testing
 
 ###############################################################################
-# Step 1: Recoding to make R formatting happy and variable selection
+# Step 1: Recoding and variable selection
 ###############################################################################
 d_analysis <- d_tables %>% 
   mutate(across(c(readmission_30days_recode,
@@ -66,7 +68,7 @@ d_analysis <- d_tables %>%
     facility_name_analysis,
     # Numeric predictors
     age_at_encounter,
-    log_los_in_hours,
+    los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
          ) %>% 
@@ -85,12 +87,12 @@ d_analysis <- d_tables %>%
     facility_name_analysis,
     # Numeric predictors
     age_at_encounter,
-    log_los_in_hours,
+    los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality)
 
 ###############################################################################
-# Step 2: Defining predictor variables for HOSPITAL and NEWS models 
+# Step 2: Defining independent variables for HOSPITAL and NEWS models 
 ###############################################################################
 all_variables <- names(d_analysis)
 outcome_variables <- names(d_analysis)[1:3]
@@ -108,12 +110,13 @@ news_variables <- data.frame(
 ###############################################################################
 # Step 3: Bivariate analysis
 ###############################################################################
+# Function to produce bivariate regression results  for given outcome and predictors
 bivariate_glm <- function(data, outcome, predictors) {
   results <- list()
   for (predictor in predictors) {
     formula <- as.formula(paste(outcome, "~", predictor))
     model <- glm(formula, data = data, family = binomial)
-    results[[predictor]] <- tidy(model)[-1,c(1,2,5)]
+    results$model[[predictor]] <- tidy(model)[-1,c(1,2,5)]
   }
   return(results)
 }
@@ -129,6 +132,7 @@ death_results <- bivariate_glm(d_analysis,
                                outcome_variables[3], 
                                c(score_variables,predictors))
 
+# Create results tables and view
 view(readmission_table <- do.call(rbind, readmission_results) %>% 
        mutate(across(where(is.numeric), round, 3)))
 view(ed_table <- do.call(rbind, ed_results) %>% 
@@ -137,7 +141,49 @@ view(death_table <- do.call(rbind, death_results) %>%
        mutate(across(where(is.numeric), round, 3)))
 
 ###############################################################################
-# Step 4: Creating 6 models for the 3 endpoints and 2 scoring systems
+# Step 4: Plotting of numeric predictors and outcomes
+###############################################################################
+# Subset data
+news_subset <- d_analysis[, news_variables$variable]
+news_numeric_vars <- sapply(news_subset, is.numeric)
+news_numeric_subset <- names(news_subset[, news_numeric_vars])
+
+# Subset data
+hospital_subset <- d_analysis[, hospital_variables$variable]
+hospital_numeric_vars <- sapply(hospital_subset, is.numeric)
+hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
+
+# for (predictor in predictors) {
+#   if (is.numeric(data[[predictor]])) {
+#     logit <- function(pr) log(pr/(1-pr))
+#     loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
+#     pi <- pmax(pmin(loessfit,0.9999),0.0001)
+#     logitfitted <- logit(pi)
+#     o <- order(data[[predictor]])
+#     results$plot[[predictor]] <- plot(data[[predictor]][o],logitfitted[o],type="l")
+# }
+###############################################################################
+# Step 4: Collinearity of numeric predictors
+###############################################################################
+
+# NEWS model collinearity
+# Calculate the correlation matrix for news_numeric_subset
+news_correlation_matrix <- round(cor(news_numeric_subset, 
+                                     use='pairwise.complete.obs'),3)
+
+# View NEWS correlation matrix
+view(news_correlation_matrix)
+
+# HOSPITAL model collinearity
+# Calculate the correlation matrix for hospital_numeric_subset
+hospital_correlation_matrix <- round(cor(hospital_numeric_subset, 
+                                         use='pairwise.complete.obs'),3)
+
+# View HOSPITAL correlation matrix
+view(hospital_correlation_matrix)
+
+###############################################################################
+# Step 5: Creating simple additive models
 ###############################################################################
 model_formulas <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
@@ -157,88 +203,6 @@ model_formulas <- list(
 fits_1 <- lapply(model_formulas, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
-
-###############################################################################
-# Step 5: Purposeful variable selection
-###############################################################################
-
-# Step 5a: Type III testing
-drop1_list <- lapply(fits_1, function(fit) {
-  drop1(fit, test = "LRT")
-})
-
-# Creating a table of p-values from the Type III tests
-drop1_table <- do.call(cbind, lapply(drop1_list, function(x) x$`Pr(>Chi)`[-1]))
-
-# Including significance signifiers
-drop1_table_starred <- apply(drop1_table, 2, function(x) {
-  case_when(
-    x >= 0.1 ~ as.character(round(x, 3)),
-    x >= 0.05 ~ paste0(round(x, 3), " -"),
-    x >= 0.01 ~ paste0(round(x, 3), " **"),
-    x >= 0.001 ~ paste0(round(x, 3), " ***"),
-    TRUE ~ "<0.001 ****"
-  )
-})
-
-# Naming tables
-rownames(drop1_table_starred) <- c("Discharge Scores",
-                                   "Payor Category",
-                                   "Sex",
-                                   "Race",
-                                   "Ethnicity",
-                                   "Primary Language",
-                                   "Visited ICU",
-                                   "Discharge Disposition",
-                                   "Discharge Service",
-                                   "Facility Name",
-                                   "Age",
-                                   "Admission Scores",
-                                   "Day -1 Scores",
-                                   "Day -2 Scores")
-        
-colnames(drop1_table_starred) <- c("HOSPITAL Readmission", 
-                                   "HOSPITAL ED Visit",
-                                   "HOSPITAL Death",
-                                   "NEWS Readmission",
-                                   "NEWS ED Visit",
-                                   "NEWS Death")
-
-# View table
-view(drop1_table_starred)
-
-# Step 5b: Correlation matrices for HOSPITAL and NEWS scores
-news_subset <- d_analysis[, news_variables$variable]
-
-# Subset news_subset to include only numeric variables
-news_numeric_vars <- sapply(news_subset, is.numeric)
-news_numeric_subset <- news_subset[, news_numeric_vars]
-
-# Calculate the correlation matrix for news_numeric_subset
-news_correlation_matrix <- round(cor(news_numeric_subset, 
-                                     use='pairwise.complete.obs'),3)
-
-# View NEWS correlation matrix
-view(news_correlation_matrix)
-
-hospital_subset <- d_analysis[, hospital_variables$variable]
-
-# Subset hospital_subset to include only numeric variables
-hospital_numeric_vars <- sapply(hospital_subset, is.numeric)
-hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
-
-# Calculate the correlation matrix for hospital_numeric_subset
-hospital_correlation_matrix <- round(cor(hospital_numeric_subset, 
-                                     use='pairwise.complete.obs'),3)
-
-d_analysis_filtered <- subset(d_analysis, dc_disp_category_analysis != "Missing")
-
-# View HOSPITAL correlation matrix
-view(hospital_correlation_matrix)
-
-attributes(alias(fits_1[[1]])$Complete)$dimnames[[1]]
-
-vif(fits_1[[4]])
 
 ###############################################################################
 # Step 6: Fitting the interactive models
@@ -263,40 +227,21 @@ fits_i <- lapply(model_formulas_i, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
 
-# Perform drop1() on each model fit
-drop1_list_i <- lapply(fits_i, function(fit) {
+###############################################################################
+# Step 7: Type III Testing
+###############################################################################
+
+# Additive model type III testing
+# Apply test for additive fits
+drop1_list_1 <- lapply(fits_1, function(fit) {
   drop1(fit, test = "LRT")
 })
 
-# Create the drop1_table using do.call() and cbind()
-drop1_table_i <- do.call(cbind, lapply(drop1_list_i, function(x) x$`Pr(>Chi)`[-1]))
+# Creating a table of p-values from the Type III tests
+drop1_table_1 <- do.call(cbind, lapply(drop1_list, function(x) x$`Pr(>Chi)`[-1]))
 
-# Define the row and column names separately and assign them to the drop1_table
-### TO DO: match interaction coeffificnets to rows. Move ordering to last
-custom_order_i <- c("Discharge Scores",
-                  "Payor Category",
-                  "Discharge*Payor",
-                  "Day -1 Scores", 
-                  "Day -2 Scores",
-                  "Admission Scores",
-                  "Age",
-                  "Sex",
-                  "Race",
-                  "Ethnicity",
-                  "Primary Language",
-                  "Visited ICU",
-                  "Discharge Disposition",
-                  "Discharge Service",
-                  "Facility Name")
-
-# Order the rows of drop1_table using dplyr functions
-drop1_table_ordered_i <- drop1_table_i %>%
-  as.data.frame() %>%
-  slice(match(custom_order, rownames(drop1_table_i))) %>%
-  as.matrix()
-
-# Simplify the ifelse() statements in the drop1_table_starred creation
-drop1_table_starred_i <- apply(drop1_table_ordered_i, 2, function(x) {
+# Including significance in tables
+drop1_table_starred_1 <- apply(drop1_table, 2, function(x) {
   case_when(
     x >= 0.1 ~ as.character(round(x, 3)),
     x >= 0.05 ~ paste0(round(x, 3), " -"),
@@ -306,26 +251,61 @@ drop1_table_starred_i <- apply(drop1_table_ordered_i, 2, function(x) {
   )
 })
 
-rownames(drop1_table_starred_i) <- c("Discharge Scores",
-                                   "Payor Category",
-                                   "Sex",
-                                   "Race",
-                                   "Ethnicity",
-                                   "Primary Language",
-                                   "Visited ICU",
-                                   "Discharge Disposition",
-                                   "Discharge Service",
-                                   "Facility Name",
-                                   "Age",
-                                   "Admission Scores",
-                                   "Day -1 Scores",
-                                   "Day -2 Scores")
+# Naming tables
+table_row_names <- c("Discharge Score",
+                     "Payor Category",
+                     "Sex",
+                     "Race",
+                     "Ethnicity",
+                     "Primary Language",
+                     "Visited ICU",
+                     "Discharge Disposition",
+                     "Discharge Service",
+                     "Patient Class",
+                     "Facility Name",
+                     "Age",
+                     "Log Length of Stay",
+                     "CMR Readmission Index",
+                     "CMR Mortality Index",
+                     "Discharge*Payor")
 
-colnames(drop1_table_starred) <- c("HOSPITAL Readmission", 
-                                   "HOSPITAL ED Visit",
-                                   "HOSPITAL Death",
-                                   "NEWS Readmission",
-                                   "NEWS ED Visit",
-                                   "NEWS Death")
+table_column_names <- c("HOSPITAL Readmission", 
+                        "HOSPITAL ED Visit",
+                        "HOSPITAL Death",
+                        "NEWS Readmission",
+                        "NEWS ED Visit",
+                        "NEWS Death")
 
-view(drop1_table_starred)
+rownames(drop1_table_starred_1) <- table_row_names[-16]
+
+colnames(drop1_table_starred_1) <- table_column_names
+
+# View table
+view(drop1_table_starred_1)
+
+# Interatctive model Type III testing
+# Perform drop1() on each model fit
+drop1_list_i <- lapply(fits_i, function(fit) {
+  drop1(fit, test = "LRT")
+})
+
+# Creating a table of p-values from the Type III tests
+drop1_table_i <- do.call(cbind, lapply(drop1_list_i, function(x) x$`Pr(>Chi)`[-1]))
+
+# Including significance in tables
+drop1_table_starred_i <- apply(drop1_table_i, 2, function(x) {
+  case_when(
+    x >= 0.1 ~ as.character(round(x, 3)),
+    x >= 0.05 ~ paste0(round(x, 3), " -"),
+    x >= 0.01 ~ paste0(round(x, 3), " **"),
+    x >= 0.001 ~ paste0(round(x, 3), " ***"),
+    TRUE ~ "<0.001 ****"
+  )
+})
+
+rownames(drop1_table_starred_i) <- table_row_names[3:length(table_row_names)]
+
+colnames(drop1_table_starred_i) <- table_column_names
+
+view(drop1_table_starred_i)
+
