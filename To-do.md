@@ -5,7 +5,7 @@ Overall
 Tables
 - Add n to descriptive tables
 - Add overall column to tables
-- Excel final output
+- Final output
 
 Aim 1
 - Adjust for colinearity of scores

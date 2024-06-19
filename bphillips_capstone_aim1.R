@@ -73,8 +73,9 @@ d_analysis <- d_tables %>%
     CMR_Index_Mortality
          ) %>% 
   
-  drop_na(
+  # filter(complete.cases(d_analysis[14:length(d_analysis)]))
     # Categorical predictors
+  drop_na(  
     payor_category_analysis,
     sex_recode_analysis,
     race_category_analysis,
@@ -114,9 +115,14 @@ news_variables <- data.frame(
 bivariate_glm <- function(data, outcome, predictors) {
   results <- list()
   for (predictor in predictors) {
+    data <- data %>% 
+      filter(!is.na(data[[predictor]]))
+    formul <- as.formula(paste(outcome, "~ 1"))
+    uni_model <- glm(formul, data = data, family = binomial)
     formula <- as.formula(paste(outcome, "~", predictor))
     model <- glm(formula, data = data, family = binomial)
     results$model[[predictor]] <- tidy(model)[-1,c(1,2,5)]
+    results$lrt[[predictor]] <- tidy(anova(uni_model, model,test="LRT"))[-1,c(1,5,6)]
   }
   return(results)
 }
@@ -133,11 +139,19 @@ death_results <- bivariate_glm(d_analysis,
                                c(score_variables,predictors))
 
 # Create results tables and view
-view(readmission_table <- do.call(rbind, readmission_results) %>% 
+view(readmission_table_models <- do.call(rbind, readmission_results$model) %>% 
        mutate(across(where(is.numeric), round, 3)))
-view(ed_table <- do.call(rbind, ed_results) %>% 
+view(ed_table_models <- do.call(rbind, ed_results$model) %>% 
        mutate(across(where(is.numeric), round, 3)))
-view(death_table <- do.call(rbind, death_results) %>% 
+view(death_table_models <- do.call(rbind, death_results$model) %>% 
+       mutate(across(where(is.numeric), round, 3)))
+
+# Create LRT tables and view
+view(readmission_table_lrt <- do.call(rbind, readmission_results$lrt) %>% 
+       mutate(across(where(is.numeric), round, 3)))
+view(ed_table_lrt <- do.call(rbind, ed_results$lrt) %>% 
+       mutate(across(where(is.numeric), round, 3)))
+view(death_table_lrt <- do.call(rbind, death_results$lrt) %>% 
        mutate(across(where(is.numeric), round, 3)))
 
 ###############################################################################
@@ -238,7 +252,7 @@ news_numeric_vars <- sapply(news_subset, is.numeric)
 news_numeric_subset <- names(news_subset[, news_numeric_vars])
 
 # Calculate the correlation matrix for news_numeric_subset
-news_correlation_matrix <- round(cor(news_numeric_subset, 
+news_correlation_matrix <- round(cor(d_analysis[news_numeric_subset], 
                                      use='pairwise.complete.obs'),3)
 
 # View NEWS correlation matrix

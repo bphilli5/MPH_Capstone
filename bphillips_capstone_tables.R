@@ -194,3 +194,30 @@ numeric_table <- d_tables %>%
 # View tables
 view(categorical_table)
 view(numeric_table)
+
+###############################################################################
+# Step 4: Overall figures and payor stata counts
+###############################################################################
+# Payor strata counts
+payor_cats <- unique(d_tables$payor_category)
+payor_counts <- lapply(payor_cats, function(cat) {
+  sum(d_tables$payor_category==cat)
+})
+(catsncounts <- cbind(payor_cats,payor_counts))
+
+overall_figures <- list()
+for (var in var_names) {
+  if (is.numeric(d_tables[[var]])) {
+    avg <- round(mean(d_tables[[var]], na.rm=T),2)
+    sd <- round(sd(d_tables[[var]], na.rm=T),2)
+    overall_figures[[var]] <- paste0(avg," (",sd,")")
+  }
+  else if (is.character(d_tables[[var]])){
+    names <- unique(d_tables[[var]])
+    for (name in names) {
+      count <- sum(d_tables[[var]]==name)
+      pct <- round(count/length(d_tables[[var]]),3)*100
+      overall_figures[[var]][names] <- paste0(count," (",pct,"%)")
+    }
+  }
+}
