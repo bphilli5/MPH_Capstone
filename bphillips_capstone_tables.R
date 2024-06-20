@@ -63,24 +63,6 @@ d_tables <- d_sas %>%
     CMR_Index_Mortality
     ) %>% 
   
-  drop_na(  
-    payor_category,
-    sex_recode,
-    race_category,
-    ethnicity_recode,
-    language_category,
-    ICU_category,
-    dc_disp_category,
-    discharge_service,
-    patient_class,
-    facility_name,
-    # Numeric predictors
-    age_at_encounter,
-    los_in_hours,
-    CMR_Index_Readmission,
-    CMR_Index_Mortality
-  ) %>% 
-  
   filter(
     age_at_encounter < 110
   )
