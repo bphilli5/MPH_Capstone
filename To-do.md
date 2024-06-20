@@ -9,7 +9,6 @@ Tables
 
 Aim 1
 - Assess numeric assumption of indices
-
 - Model age with splines
 
 Aim 2

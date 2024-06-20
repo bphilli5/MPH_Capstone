@@ -26,7 +26,7 @@ d_analysis <- d_tables %>%
                   .== "Yes" ~ 1,
                   .default=NULL),
                 .names="{.col}_analysis"),
-         (across(c(payor_category,
+         across(c(payor_category,
                    sex_recode,
                    race_category,
                    ethnicity_recode,
@@ -37,7 +37,7 @@ d_analysis <- d_tables %>%
                    patient_class,
                    facility_name),
                  ~factor(.),
-                 .names="{.col}_analysis"))) %>% 
+                 .names="{.col}_analysis")) %>% 
   
   select(
     # Outcomes
@@ -73,27 +73,38 @@ d_analysis <- d_tables %>%
     CMR_Index_Mortality
          ) %>% 
 
-
   drop_na(  
-    payor_category,
-    sex_recode,
-    race_category,
-    ethnicity_recode,
-    language_category,
-    ICU_category,
-    dc_disp_category,
-    discharge_service,
-    patient_class,
-    facility_name,
+    payor_category_analysis,
+    sex_recode_analysis,
+    race_category_analysis,
+    ethnicity_recode_analysis,
+    language_category_analysis,
+    ICU_category_analysis,
+    dc_disp_category_analysis,
+    discharge_service_analysis,
+    patient_class_analysis,
+    facility_name_analysis,
     # Numeric predictors
     age_at_encounter,
     los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
+  ) %>% 
+  
+  mutate(across(c(discharge_HOSPITAL_score,
+                  day_minus_1_HOSPITAL_score,
+                  day_minus_2_HOSPITAL_score,
+                  admission_HOSPITAL_score,
+                  discharge_news_score,
+                  day_minus_1_news_score,
+                  day_minus_2_news_score,
+                  admission_news_score),
+                        ~factor(.),
+                        .names="{.col}_factor")
   )
 
 
-###############################################################################
+d###############################################################################
 # Step 2: Defining independent variables for HOSPITAL and NEWS models 
 ###############################################################################
 all_variables <- names(d_analysis)
@@ -242,8 +253,16 @@ readmission_plot_grid <- grid.arrange(grobs=readmission_plots,
 #                                         predictors)
 # death_log_plot_grid <- grid.arrange(grobs=death_log_plots, 
 #                                     top="30-Day Death - Log")
+
 ###############################################################################
-# Step 4: Collinearity of numeric predictors
+# Step 4: Assesing assumption of linearity for indices
+###############################################################################
+
+index_variables <- d_analysis[]
+
+
+###############################################################################
+# Step 5: Collinearity of numeric predictors
 ###############################################################################
 
 # NEWS model collinearity
