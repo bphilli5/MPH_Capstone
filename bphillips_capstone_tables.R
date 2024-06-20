@@ -7,7 +7,7 @@
 #> Step 2: Sorting tables
 #> Step 3: Creating categorical variable table
 #> Step 4: Creating numeric variable table
-#> Step 5: Overall figures TODO
+#> Step 5: Overall figures
 
 ###############################################################################
 # Step 1: Categorical variable recoding + variable selection 
@@ -61,7 +61,29 @@ d_tables <- d_sas %>%
     los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
-    )
+    ) %>% 
+  
+  drop_na(  
+    payor_category,
+    sex_recode,
+    race_category,
+    ethnicity_recode,
+    language_category,
+    ICU_category,
+    dc_disp_category,
+    discharge_service,
+    patient_class,
+    facility_name,
+    # Numeric predictors
+    age_at_encounter,
+    los_in_hours,
+    CMR_Index_Readmission,
+    CMR_Index_Mortality
+  ) %>% 
+  
+  filter(
+    age_at_encounter < 110
+  )
 
 ###############################################################################
 # Step 2: Setting up the sorting of the tables
@@ -183,11 +205,11 @@ numeric_table <- d_tables %>%
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
   group_by(payor_category, variable) %>% 
   summarise(
-    mean = round(mean(value, na.rm = TRUE), 1),
-    sd = round(sd(value, na.rm = TRUE), 1)
+    med = round(median(value, na.rm = TRUE), 1),
+    iqr = round(IQR(value, na.rm = TRUE), 1)
   ) %>% 
-  mutate(result = paste0(mean, " (", sd, ")")) %>% 
-  select(-mean, -sd) %>% 
+  mutate(result = paste0(med, " (", iqr, ")")) %>% 
+  select(-med, -iqr) %>% 
   pivot_wider(names_from = payor_category, 
               values_from = result, values_fill = "0 (0)")
 
@@ -205,6 +227,7 @@ payor_counts <- lapply(payor_cats, function(cat) {
 })
 (catsncounts <- cbind(payor_cats,payor_counts))
 
+var_names <- names(d_tables)
 overall_figures <- list()
 for (var in var_names) {
   if (is.numeric(d_tables[[var]])) {
