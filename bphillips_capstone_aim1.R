@@ -46,14 +46,14 @@ d_analysis <- d_tables %>%
     death_30_days_analysis,
     # Scores
     discharge_HOSPITAL_score,
-    discharge_news_score,
     day_minus_1_HOSPITAL_score,
-    day_minus_1_news_score,
     day_minus_2_HOSPITAL_score,
-    day_minus_2_news_score,
     admission_HOSPITAL_score,
-    admission_news_score,
     average_HOSPITAL_score,
+    discharge_news_score,
+    day_minus_1_news_score,
+    day_minus_2_news_score,
+    admission_news_score,
     average_NEWS_score,
     # Categorical predictors
     payor_category_analysis,
@@ -71,26 +71,7 @@ d_analysis <- d_tables %>%
     los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
-         ) %>% 
-  
-  # filter(complete.cases(d_analysis[14:length(d_analysis)]))
-    # Categorical predictors
-  drop_na(  
-    payor_category_analysis,
-    sex_recode_analysis,
-    race_category_analysis,
-    ethnicity_recode_analysis,
-    language_category_analysis,
-    ICU_category_analysis,
-    dc_disp_category_analysis,
-    discharge_service_analysis,
-    patient_class_analysis,
-    facility_name_analysis,
-    # Numeric predictors
-    age_at_encounter,
-    los_in_hours,
-    CMR_Index_Readmission,
-    CMR_Index_Mortality)
+         ) 
 
 ###############################################################################
 # Step 2: Defining independent variables for HOSPITAL and NEWS models 
@@ -100,11 +81,11 @@ outcome_variables <- names(d_analysis)[1:3]
 score_variables <- names(d_analysis)[4:13]
 predictors <- names(d_analysis)[14:length(d_analysis)]
 hospital_variables <- data.frame(
-  variable = c(score_variables[1],
+  variable = c(score_variables[1:6],
                predictors)
 )
 news_variables <- data.frame(
-  variable = c(score_variables[2],
+  variable = c(score_variables[6:10],
                predictors)
 )
 
@@ -204,43 +185,43 @@ readmission_plot_grid <- grid.arrange(grobs=readmission_plots,
                                       top="30-Day Readmission")
 
 # Log transformations
-plot_log_association <- function(data, outcome, predictors) {
-  results <- list()
-  logit <- function(pr) log(pr/(1-pr))
-  for (predictor in predictors) {
-    if (is.numeric(data[[predictor]]) && all(data[[predictor]] >= 0)) {
-      data[[predictor]] <- log(data[[predictor]])
-      loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
-      pi <- pmax(pmin(loessfit,0.9999),0.0001)
-      logitfitted <- logit(pi)
-      o <- order(data[[predictor]])
-      plot_data <- data.frame(x = data[[predictor]][o],
-                              y = logitfitted[o])
-      plot <- ggplot(plot_data, aes(x = x, y = y)) +
-        geom_line() +
-        labs(x = predictor)
-      results[[predictor]] <- plot
-    }
-  }
-  return(results)
-}
-readmission_log_plots <- plot_log_association(d_analysis,
-                                             outcome_variables[1],
-                                             predictors)
-readmission_log_plot_grid <- grid.arrange(grobs=readmission_log_plots, 
-                                      top="30-Day Readmission - Log")
-
-ed_log_plots <- plot_log_association(d_analysis,
-                                     outcome_variables[2],
-                                     predictors)
-ed_log_plot_grid <- grid.arrange(grobs=ed_log_plots, 
-                                 top="30-Day ED Readmission - Log")
-
-death_log_plots <- plot_log_association(d_analysis,
-                                        outcome_variables[3],
-                                        predictors)
-death_log_plot_grid <- grid.arrange(grobs=death_log_plots, 
-                                    top="30-Day Death - Log")
+# plot_log_association <- function(data, outcome, predictors) {
+#   results <- list()
+#   logit <- function(pr) log(pr/(1-pr))
+#   for (predictor in predictors) {
+#     if (is.numeric(data[[predictor]]) && all(data[[predictor]] >= 0)) {
+#       data[[predictor]] <- log(data[[predictor]])
+#       loessfit <- predict(loess(data[[outcome]]~data[[predictor]]))
+#       pi <- pmax(pmin(loessfit,0.9999),0.0001)
+#       logitfitted <- logit(pi)
+#       o <- order(data[[predictor]])
+#       plot_data <- data.frame(x = data[[predictor]][o],
+#                               y = logitfitted[o])
+#       plot <- ggplot(plot_data, aes(x = x, y = y)) +
+#         geom_line() +
+#         labs(x = predictor)
+#       results[[predictor]] <- plot
+#     }
+#   }
+#   return(results)
+# }
+# readmission_log_plots <- plot_log_association(d_analysis,
+#                                              outcome_variables[1],
+#                                              predictors)
+# readmission_log_plot_grid <- grid.arrange(grobs=readmission_log_plots, 
+#                                       top="30-Day Readmission - Log")
+# 
+# ed_log_plots <- plot_log_association(d_analysis,
+#                                      outcome_variables[2],
+#                                      predictors)
+# ed_log_plot_grid <- grid.arrange(grobs=ed_log_plots, 
+#                                  top="30-Day ED Readmission - Log")
+# 
+# death_log_plots <- plot_log_association(d_analysis,
+#                                         outcome_variables[3],
+#                                         predictors)
+# death_log_plot_grid <- grid.arrange(grobs=death_log_plots, 
+#                                     top="30-Day Death - Log")
 ###############################################################################
 # Step 4: Collinearity of numeric predictors
 ###############################################################################
@@ -327,10 +308,10 @@ drop1_list_1 <- lapply(fits_1, function(fit) {
 })
 
 # Creating a table of p-values from the Type III tests
-drop1_table_1 <- do.call(cbind, lapply(drop1_list, function(x) x$`Pr(>Chi)`[-1]))
+drop1_table_1 <- do.call(cbind, lapply(drop1_list_1, function(x) x$`Pr(>Chi)`[-1]))
 
 # Including significance in tables
-drop1_table_starred_1 <- apply(drop1_table, 2, function(x) {
+drop1_table_starred_1 <- apply(drop1_table_1, 2, function(x) {
   case_when(
     x >= 0.1 ~ as.character(round(x, 3)),
     x >= 0.05 ~ paste0(round(x, 3), " -"),
