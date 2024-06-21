@@ -176,7 +176,7 @@ score_variable_averages <- names(d_analysis)[44:45]
 score_variable_trend <- names(d_analysis)[46:47]
 predictors <- names(d_analysis)[14:27]
 # Removing LOS based on clinical irrelevance of results
-predictors <- predictors[-12]
+predictors_1 <- predictors[-12]
 hospital_variables <- data.frame(
   variable = c(score_variables[1:5],
                predictors)
@@ -347,11 +347,11 @@ hospital_scores_death <- hospital_scores[-c(4,6:8,10:13)]
 # all scenarios except admission
 news_scores_death <- news_scores[-c(1:3,9:13)]
 
-hospital_scores <- c(score_variables[1:5],
+hospital_scores_1 <- c(score_variables[1:5],
                      score_variable_averages[1],
                      score_variable_trend[1])
 
-news_scores <- c(score_variables[6:10],
+news_scores_1 <- c(score_variables[6:10],
                  score_variable_averages[2],
                  score_variable_trend[2])
 
@@ -536,7 +536,7 @@ view(hospital_correlation_matrix)
 ###############################################################################
 model_formulas_1 <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
-                          paste(hospital_scores, collapse = " + "),
+                          paste(hospital_scores_1, collapse = " + "),
                           " + ",
                           paste(predictors, collapse = " + ")),
   # hospital_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
@@ -544,11 +544,11 @@ model_formulas_1 <- list(
   #                             " + ",
   #                             paste(predictors, collapse = " + ")),
   hospital_death <- paste0("death_30_days_analysis ~ ",
-                           paste(hospital_scores, collapse = " + "),
+                           paste(hospital_scores_1, collapse = " + "),
                            " + ",
                            paste(predictors, collapse = " + ")),
   news_read <- paste0("readmission_30days_recode_analysis ~ ",
-                          paste(news_scores, collapse = " + "),
+                          paste(news_scores_1, collapse = " + "),
                       " + ",
                           paste(predictors, collapse = " + ")),
   # news_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
@@ -556,7 +556,7 @@ model_formulas_1 <- list(
   #                         " + ",
   #                             paste(predictors, collapse = " + ")),
   news_death <- paste0("death_30_days_analysis ~ ",
-                           paste(news_scores, collapse = " + "),
+                           paste(news_scores_1, collapse = " + "),
                        " + ",
                            paste(predictors, collapse = " + "))
 )
@@ -633,35 +633,35 @@ view(drop1_table_starred_1)
 ###############################################################################
 # Applying drop1 resutls
 
-hospital_scores <- hospital_scores[-c(5:6)]
-news_scores <- news_scores[-c(5:6)]
-predictors <- predictors[-c(6,9,13)]
+hospital_scores_2 <- hospital_scores_1[-c(5:6)]
+news_scores_2 <- news_scores_1[-c(5:6)]
+predictors_2 <- predictors_1[-c(6,9,13)]
 
 model_formulas_2 <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
-                          paste(hospital_scores, collapse = " + "),
+                          paste(hospital_scores_2, collapse = " + "),
                           " + ",
-                          paste(predictors, collapse = " + ")),
+                          paste(predictors_2, collapse = " + ")),
   # hospital_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[2:5], collapse = " + "),
   #                             " + ",
   #                             paste(predictors, collapse = " + ")),
   hospital_death <- paste0("death_30_days_analysis ~ ",
-                           paste(hospital_scores, collapse = " + "),
+                           paste(hospital_scores_2, collapse = " + "),
                            " + ",
-                           paste(predictors, collapse = " + ")),
+                           paste(predictors_2, collapse = " + ")),
   news_read <- paste0("readmission_30days_recode_analysis ~ ",
-                      paste(news_scores, collapse = " + "),
+                      paste(news_scores_2, collapse = " + "),
                       " + ",
-                      paste(predictors, collapse = " + ")),
+                      paste(predictors_2, collapse = " + ")),
   # news_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[6:20], collapse = " + "),
   #                         " + ",
   #                             paste(predictors, collapse = " + ")),
   news_death <- paste0("death_30_days_analysis ~ ",
-                       paste(news_scores, collapse = " + "),
+                       paste(news_scores_2, collapse = " + "),
                        " + ",
-                       paste(predictors, collapse = " + "))
+                       paste(predictors_2, collapse = " + "))
 )
 
 fits_2 <- lapply(model_formulas_2, function(formula) {
