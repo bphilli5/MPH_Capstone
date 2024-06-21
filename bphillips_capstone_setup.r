@@ -9,6 +9,7 @@ library(broom)
 library(ggplot2)
 library(tidyverse)
 library(gridExtra)
+library(mgcv)
 
 # Reading data files
 d_sas <- read_sas("S:/HMG-Capstone-Phillips/Data/dedup_pt_encounters_eci_analysis.sas7bdat")
