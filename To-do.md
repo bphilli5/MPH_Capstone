@@ -10,6 +10,7 @@ Tables
 Aim 1
 - Assess numeric assumption of indices
 - Model age with splines
+- Fix score plots
 
 Aim 2
 - All of it
@@ -44,3 +45,4 @@ Notes for Denver
 - Median vs average
 - Removing LOS
 - Different scoring ideas
+- Using average of last three days cuts sample from ~70k for discharge to ~43k
