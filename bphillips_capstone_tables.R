@@ -23,7 +23,7 @@ d_tables <- d_sas %>%
          sex_recode = ifelse(sex == "", "Unknown", sex),
          ethnicity_recode = case_when(
            ethnicity == "Hispanic, Latino/a, or Spanish Origin" ~ "Hispanic",
-           ethnicity == "Non-Hispanic, Latino/a, or Spanish Origin" ~ "Hispanic",
+           ethnicity == "Non-Hispanic, Latino/a, or Spanish Origin" ~ "Non-Hispanic",
            ethnicity == "Patient Unable to Answer" ~ "Unknown",
            ethnicity == "*Unspecified" ~ "Unknown",
            ethnicity == "" ~ "Unknown",
@@ -67,6 +67,7 @@ d_tables <- d_sas %>%
     age_at_encounter < 110
   )
 
+attach(d_analysis)
 ###############################################################################
 # Step 2: Setting up the sorting of the tables
 ###############################################################################
@@ -195,10 +196,6 @@ numeric_table <- d_tables %>%
   pivot_wider(names_from = payor_category, 
               values_from = result, values_fill = "0 (0)")
 
-# View tables
-view(categorical_table)
-view(numeric_table)
-
 ###############################################################################
 # Step 4: Overall figures and payor stata counts
 ###############################################################################
@@ -210,19 +207,90 @@ payor_counts <- lapply(payor_cats, function(cat) {
 (catsncounts <- cbind(payor_cats,payor_counts))
 
 var_names <- names(d_tables)
-overall_figures <- list()
+
 for (var in var_names) {
   if (is.numeric(d_tables[[var]])) {
-    avg <- round(mean(d_tables[[var]], na.rm=T),2)
-    sd <- round(sd(d_tables[[var]], na.rm=T),2)
-    overall_figures[[var]] <- paste0(avg," (",sd,")")
+    avg <- round(median(d_tables[[var]], na.rm=TRUE), 2)
+    sd <- round(IQR(d_tables[[var]], na.rm=TRUE), 2)
+    overall_figures[[var]] <- paste0(avg, " (", sd, ")")
   }
-  else if (is.character(d_tables[[var]])){
+  else if (is.character(d_tables[[var]])) {
     names <- unique(d_tables[[var]])
-    for (name in names) {
-      count <- sum(d_tables[[var]]==name)
-      pct <- round(count/length(d_tables[[var]]),3)*100
-      overall_figures[[var]][names] <- paste0(count," (",pct,"%)")
+    overall_figures[[var]] <- character(length(names))  # Initialize vector
+    for (i in seq_along(names)) {
+      name <- names[i]
+      count <- sum(d_tables[[var]] == name, na.rm=TRUE)
+      pct <- round(count / length(d_tables[[var]]) * 100, 1)
+      overall_figures[[var]][i] <- paste0(count, " (", pct, "%)")
     }
+    names(overall_figures[[var]]) <- names  # Assign names to the vector
   }
 }
+
+combined_table <- rbind(categorical_table, numeric_table)
+
+combined_table["Overall"] <- c(overall_figures$readmission_30days_recode['Yes'],
+                               overall_figures$readmission_30days_recode['No'],
+                               overall_figures$ed_30days_recode['Yes'],
+                               overall_figures$ed_30days_recode['No'],
+                               overall_figures$death_30_days['Yes'],
+                               overall_figures$death_30_days['No'],
+                               overall_figures$sex_recode['Male'],
+                               overall_figures$sex_recode['Female'],
+                               overall_figures$sex_recode['Unknown'],
+                               overall_figures$race_category['White or Caucasian'],
+                               overall_figures$race_category['Black or African American'],
+                               overall_figures$race_category['Asian'],
+                               overall_figures$race_category['American Indian or Alaska Native'],
+                               overall_figures$race_category['Native Hawaiian and Other Pacific Islander'],
+                               overall_figures$race_category['More than one race'],
+                               overall_figures$race_category['Other'],
+                               overall_figures$race_category['Missing'],
+                               overall_figures$ethnicity_recode['Hispanic'],
+                               overall_figures$ethnicity_recode['Non-Hispanic'],
+                               overall_figures$ethnicity_recode['Unknown'],
+                               overall_figures$language_category['English'],
+                               overall_figures$language_category['Spanish'],
+                               overall_figures$language_category['Other'],
+                               overall_figures$language_category['Missing'],
+                               overall_figures$ICU_category['Yes'],
+                               overall_figures$ICU_category['No'],
+                               overall_figures$dc_disp_category['Home'],
+                               overall_figures$dc_disp_category['Post-acute care'],
+                               overall_figures$dc_disp_category['AMA'],
+                               overall_figures$dc_disp_category['Hospice'],
+                               overall_figures$dc_disp_category['Other'],
+                               overall_figures$dc_disp_category['Missing'],
+                               overall_figures$discharge_service['Medicine'],
+                               overall_figures$discharge_service['Orthopedics'],
+                               overall_figures$discharge_service['Surgery'],
+                               overall_figures$discharge_service['Other'],
+                               overall_figures$discharge_service['Missing'],
+                               overall_figures$patient_class['Inpatient'],
+                               overall_figures$patient_class['Observation'],
+                               overall_figures$facility_name['BH'],
+                               overall_figures$facility_name['GH'],
+                               overall_figures$facility_name['GVH'],
+                               overall_figures$facility_name['HRH'],
+                               overall_figures$facility_name['LPH'],
+                               overall_figures$facility_name['MCR'],
+                               overall_figures$facility_name['MHC'],
+                               overall_figures$facility_name['MHN'],
+                               overall_figures$facility_name['PPRH'],
+                               overall_figures$facility_name['PVH'],
+                               overall_figures$facility_name['UCH'],
+                               overall_figures$facility_name['YVMC'],
+                               overall_figures$facility_name['CHCO AT MHN HOSPITAL'],
+                               overall_figures$CMR_Index_Mortality,
+                               overall_figures$CMR_Index_Readmission,
+                               overall_figures$admission_HOSPITAL_score,
+                               overall_figures$admission_news_score,
+                               overall_figures$age_at_encounter,
+                               overall_figures$day_minus_1_HOSPITAL_score,
+                               overall_figures$day_minus_1_news_score,
+                               overall_figures$day_minus_2_HOSPITAL_score,
+                               overall_figures$day_minus_2_news_score,
+                               overall_figures$discharge_HOSPITAL_score,
+                               overall_figures$discharge_news_score,
+                               overall_figures$los_in_hours
+                               )
