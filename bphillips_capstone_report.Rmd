@@ -1,0 +1,106 @@
+---
+title: "bphillips_capstone_report"
+author: "Brendan Phillips"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=F, message= F}
+knitr::opts_chunk$set(echo = F)
+source("bphillips_capstone_setup.R")
+source("bphillips_capstone_tables.R")
+# source("bphillips_capstone_aim1.R")
+# source("bphillips_capstone_aim2.R")
+```
+
+## Descriptive Statistic Tables
+
+```{r final_table}
+final_table
+```
+
+
+## Bivariate Analysis with Outcomes
+
+Readmission Analysis
+```{r readmission_table_lrt}
+(tmp <- readmission_table_lrt %>%
+  mutate(term = sub(".*~\\s*", "", term)) %>% 
+  mutate(p.value = round(p.value,3)) %>% 
+  mutate(deviance = round(deviance,1)))
+```
+
+Emergency Department Readmission Analysis
+```{r ed_table_lrt}
+(tmp <- ed_table_lrt %>%
+  mutate(term = sub(".*~\\s*", "", term)) %>% 
+  mutate(p.value = round(p.value,3)) %>% 
+  mutate(deviance = round(deviance,1)))
+```
+
+Mortality Analysis
+```{r death_table_lrt}
+(tmp <- death_table_lrt %>%
+  mutate(term = sub(".*~\\s*", "", term)) %>% 
+  mutate(p.value = round(p.value,3)) %>% 
+  mutate(deviance = round(deviance,1)))
+```
+```{r readmission_score_comps}
+readmission_score_comps
+```
+
+```{r ed_score_comps}
+ed_score_comps
+```
+
+```{r death_score_comps}
+death_score_comps
+```
+
+```{r payor_bivariate_table}
+(payor_bivariate_table <- payor_bivariate_table %>% 
+  mutate(statistic = round(statistic,1),
+         p.value = round(p.value,4)
+  )
+)
+```
+
+```{r readmission_plot_grid}
+plot(readmission_plot_grid)
+```
+
+```{r ed_plot_grid}
+plot(ed_plot_grid)
+```
+
+```{r death_plot_grid}
+plot(death_plot_grid)
+```
+
+Initial HOSPITAL - Readmission Model
+```{r fits_1_HOSPITAL_Readmission}
+fits_1_summary$`HOSPITAL Readmission`[2:8,] %>% 
+  mutate(across(2:5, ~round(.,3)))
+```
+
+```{r drop1_table_starred_1}
+drop1_table_starred_1[-c(9:12,18),]
+```
+
+```{r}
+drop1_table_starred_2[-c(7:10,14),]
+```
+
+
+```{r}
+(fits_2_summary$`HOSPITAL Readmission` %>% 
+  mutate(across(2:5, ~round(.,3))))
+```
+
+```{r}
+# View NEWS correlation matrix
+# view(news_correlation_matrix)
+# 
+# # View HOSPITAL correlation matrix
+# view(hospital_correlation_matrix)
+```
