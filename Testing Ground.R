@@ -113,3 +113,35 @@ pivot_tibble <- fits_1_coeff_table %>%
     names_pattern = "(.+)_(.+)"
   )
 names(pivot_tibble) <- c("term", "model", "fit1_est", "fit1_se")
+
+
+library(multcomp)
+library(ggplot2)
+
+# Step 1: Fit your logistic regression model
+# Assuming your model is already fit and called 'model'
+# model <- glm(outcome ~ categorical_var + other_predictors, data = your_data, family = binomial)
+
+# Step 2: Perform pairwise comparisons using glht
+comparisons <- glht(fits_1[[1]], linfct = mcp(payor_category_analysis = "Tukey"))
+
+# Step 3: Get the summary of the comparisons
+summary_comp <- summary(comparisons)
+
+# Step 4: Extract the necessary information for plotting
+plot_data <- data.frame(
+  comparison = rownames(summary_comp$test$coefficients),
+  estimate = summary_comp$test$coefficients,
+  lower = summary_comp$test$coefficients - 1.96 * summary_comp$test$sigma,
+  upper = summary_comp$test$coefficients + 1.96 * summary_comp$test$sigma
+)
+
+# Step 5: Create the plot
+ggplot(plot_data, aes(x = comparison, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  coord_flip() +
+  labs(x = "Pairwise Comparison", y = "Estimated Difference (log odds)",
+       title = "Pairwise Comparisons of Categorical Variable") +
+  theme_minimal()
