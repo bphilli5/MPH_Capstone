@@ -68,7 +68,7 @@ d_analysis <- d_tables %>%
     facility_name_analysis,
     # Numeric predictors
     age_at_encounter,
-    los_in_hours,
+    # los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
          ) %>% 
@@ -86,7 +86,7 @@ d_analysis <- d_tables %>%
     facility_name_analysis,
     # Numeric predictors
     age_at_encounter,
-    los_in_hours,
+    # los_in_hours,
     CMR_Index_Readmission,
     CMR_Index_Mortality
   ) %>% 
@@ -163,7 +163,6 @@ d_analysis <- d_tables %>%
   }) %>%
   ungroup()
 
-attach(d_analysis)
 ###############################################################################
 # Step 2: Defining independent variables for HOSPITAL and NEWS models 
 ###############################################################################
@@ -198,10 +197,6 @@ news_scores <- c(score_variables[6:10],
                  score_variable_averages[2],
                  score_variable_trend[2])
 
-read_predictors <- predictors
-ed_predictors <- predictors
-death_predictors <- predictors
-
 ###############################################################################
 # Step 3: Bivariate analysis
 ###############################################################################
@@ -221,7 +216,7 @@ bivariate_glm <- function(data, outcome, predictors) {
   return(results)
 }
 
-# Perform bivariate GLM analysis for each outcome
+# Perform bivariate GLM analysis for each outcomeee
 readmission_results <- bivariate_glm(d_analysis, 
                                      outcome_variables[1], 
                                      c(predictors,
@@ -246,17 +241,13 @@ death_table_models <- do.call(rbind, death_results$model)
 # Create LRT tables and view
 readmission_table_lrt <- do.call(rbind, readmission_results$lrt)
 
-view(tmp <- readmission_table_lrt %>% 
-       mutate(p.value = round(p.value,3)))
-
 # Based on the results of the bivariate analysis, ICU_category can be removed
 # from models of readmission risk
 read_predictors <- read_predictors[-6]
 
 ed_table_lrt <- do.call(rbind, ed_results$lrt)
 
-view(tmp <- ed_table_lrt %>% 
-       mutate(p.value = round(p.value,3)))
+
 # Removing several predictors based on results
 ed_predictors <- ed_predictors[-c(19,26)]
 
@@ -266,8 +257,6 @@ news_scores_ed <- NA
 
 death_table_lrt <- do.call(rbind, death_results$lrt)
 
-view(tmp <- death_table_lrt %>% 
-       mutate(p.value = round(p.value,3)))
 
 # Removing ethnicity as a predictor
 death_predictors <- death_predictors[-4]
@@ -276,10 +265,10 @@ death_predictors <- death_predictors[-4]
 # Step 5: Comparing methods of modeling scores
 ###############################################################################
 
-readmission_score_comps <- cbind(readmission_table_lrt[c(1,2,3,4,6,7,8,9),],
-                                 readmission_table_lrt[24:31,],
-                                 readmission_table_lrt[32:39,],
-                                 readmission_table_lrt[c(5,10,40,41),]
+readmission_score_comps <- cbind(readmission_table_lrt[c(14:17,28:31),], # Numeric
+                                 readmission_table_lrt[c(19:22,33:36),], # Factor
+                                 readmission_table_lrt[c(23:26,37:40),], # Quantiles
+                                 readmission_table_lrt[c(18,27,32,41),] # Averages
 )
 
 col_names_comps <- c("Nums", "Nums Dev", "Nums p",
@@ -289,55 +278,48 @@ col_names_comps <- c("Nums", "Nums Dev", "Nums p",
 
 colnames(readmission_score_comps) <- col_names_comps
 
-readmission_score_comps <- readmission_score_comps %>% 
-  mutate(across(c(Nums,
-                  Fac,
-                  Quants,
-                  Avgs),
-                .fns = ~sub(".*~", "", .))
+readmission_score_comps <- readmission_score_comps[-c(4,7,10)] %>% 
+  mutate(Nums = sub(".*~", "", Nums),
+         across(c(2,4,6,8), ~round(.,1)),
+         across(c(3,5,7,9), ~round(.,4))
          )
-# For HOSPITAL scores, the numeric version of the variable produces a better fit
-# in all scenarios.
-hospital_scores_read <- hospital_scores[-c(6:13)]
 
-# For NEWS2 scores, the numeric version of the variable produces a better fit
-# or is comparable
+ed_score_comps <- cbind(ed_table_lrt[c(14:17,28:31),], # Numeric
+                                 ed_table_lrt[c(19:22,33:36),], # Factor
+                                 ed_table_lrt[c(23:26,37:40),], # Quantiles
+                                 ed_table_lrt[c(18,27,32,41),] # Averages
+)
 
-news_scores_read <- news_scores[-c(6:13)]
-
-ed_score_comps <- cbind(ed_table_lrt[c(1,2,3,4,6,7,8,9),],
-                          ed_table_lrt[24:31,],
-                          ed_table_lrt[32:39,],
-                        ed_table_lrt[c(5,10,40,41),])
+col_names_comps <- c("Nums", "Nums Dev", "Nums p",
+                     "Fac", "Fac Dev", "Fac p",
+                     "Quants", "Quants Dev", "Quants p",
+                     "Avgs", "Avgs Dev", "Avgs p")
 
 colnames(ed_score_comps) <- col_names_comps
 
-ed_score_comps <- ed_score_comps %>% 
-  mutate(across(c(Nums,
-                  Fac,
-                  Quants),
-                .fns = ~sub(".*~", "", .))
+ed_score_comps <- ed_score_comps[-c(4,7,10)] %>% 
+  mutate(Nums = sub(".*~", "", Nums),
+         across(c(2,4,6,8), ~round(.,1)),
+         across(c(3,5,7,9), ~round(.,4))
   )
 
-# For HOSPITAL scores, the numeric version of the variable produces a better
-# fit in all scenarios or is comparable
+death_score_comps <- cbind(death_table_lrt[c(14:17,28:31),], # Numeric
+                                 death_table_lrt[c(19:22,33:36),], # Factor
+                                 death_table_lrt[c(23:26,37:40),], # Quantiles
+                                 death_table_lrt[c(18,27,32,41),] # Averages
+)
 
-hospital_scores_ed <- hospital_scores[-c(6:13)]
-
-# No changes for NEWS scores for ed
-
-death_score_comps <- cbind(death_table_lrt[c(1,2,3,4,6,7,8,9),],
-                        death_table_lrt[24:31,],
-                        death_table_lrt[32:39,],
-                        death_table_lrt[c(5,10,40,41),])
+col_names_comps <- c("Nums", "Nums Dev", "Nums p",
+                     "Fac", "Fac Dev", "Fac p",
+                     "Quants", "Quants Dev", "Quants p",
+                     "Avgs", "Avgs Dev", "Avgs p")
 
 colnames(death_score_comps) <- col_names_comps
 
-death_score_comps <- death_score_comps %>% 
-  mutate(across(c(Nums,
-                  Fac,
-                  Quants),
-                .fns = ~sub(".*~", "", .))
+death_score_comps <- death_score_comps[-c(4,7,10)] %>% 
+  mutate(Nums = sub(".*~", "", Nums),
+         across(c(2,4,6,8), ~round(.,1)),
+         across(c(3,5,7,9), ~round(.,4))
   )
 
 # For HOSPITAL scores, the numeric version of the variable produces a better
@@ -385,12 +367,12 @@ bivariate_analysis <- function(data, outcome, predictors) {
 }
 
 # Usage
-shuggie <- bivariate_analysis(d_analysis, 
+payor_bivar <- bivariate_analysis(d_analysis, 
                               "payor_category_analysis", 
                               c(predictors[-1],
                                 score_variables))
 
-anova_table <- shuggie$anova %>%
+anova_table <- payor_bivar$anova %>%
   imap_dfr(~{
     .x %>%
       mutate(predictor = .y) %>%
@@ -402,7 +384,7 @@ anova_table <- shuggie$anova %>%
   ) %>%
   select(predictor, statistic=f_value, p.value)
 
-chi_square_table <- shuggie$chi_square %>%
+chi_square_table <- payor_bivar$chi_square %>%
   imap_dfr(~{
     .x %>%
       mutate(predictor = .y) %>%
@@ -515,8 +497,7 @@ news_numeric_subset <- names(news_subset[, news_numeric_vars])
 news_correlation_matrix <- round(cor(d_analysis[news_numeric_subset], 
                                      use='pairwise.complete.obs'),3)
 
-# View NEWS correlation matrix
-view(news_correlation_matrix)
+
 
 # HOSPITAL model collinearity
 # Subset data
@@ -528,8 +509,7 @@ hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
 hospital_correlation_matrix <- round(cor(hospital_numeric_subset, 
                                          use='pairwise.complete.obs'),3)
 
-# View HOSPITAL correlation matrix
-view(hospital_correlation_matrix)
+
 
 ###############################################################################
 # Step 5: Creating simple additive models
@@ -628,7 +608,7 @@ table_column_names <- c("HOSPITAL Readmission",
 
 rownames(drop1_table_starred_1) <- table_row_names
 colnames(drop1_table_starred_1) <- table_column_names
-view(drop1_table_starred_1)
+
 
 ###############################################################################
 # Applying drop1 resutls
@@ -731,8 +711,6 @@ fits_1_2_aic <- data.frame(
 )
 
 fits_1_2_aic$delta <- fits_1_2_aic$AIC2 - fits_1_2_aic$AIC1
-
-
 
 
 
