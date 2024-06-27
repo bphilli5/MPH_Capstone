@@ -1,19 +1,23 @@
 Overall
-- Consider additional covariates
-  - hospital_service???
 - Fix age (round down over 89?)
 
 Tables
-- Final output
-- Heavier drop_na() if one score is chosen
+- DONE
+- Rework CMR indices to have proportion of zeros and non-zero figures
 
 Aim 1
-- Assess numeric assumption of indices
-- Model age with splines
-- Fix score plots
+- Look at model coefficients for relevance
+- Principal component analysis of scores
+
 
 Aim 2
-- All of it
+- k-fold cross validation
+- ROC curve
+- Brier scores
+- Assessment of interaction
+- Sensitivity/specificity calculations
+- Calibration curve
+- Subgroup analysis
 
 Questions
 - Interpreting bivariate analysis results

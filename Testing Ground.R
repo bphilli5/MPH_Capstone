@@ -1,5 +1,5 @@
-ggplot(d_analysis, aes(x = hospital_trend)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
+ggplot(d_analysis, aes(x = discharge_news_score)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
   geom_density(color = "red") +
   labs(title = "Distribution of Hospital Trend", x = "Value", y = "Density")
 
@@ -7,64 +7,6 @@ ggplot(d_analysis, aes(x = news_trend)) +
   geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
   geom_density(color = "red") +
   labs(title = "Distribution of News Trend", x = "Value", y = "Density")
-
-
-# Testing score variables
-readmission_plots_test <- plot_linear_association(d_analysis,
-                                             outcome_variables[1],
-                                             c(score_variables, predictors))
-readmission_plot_grid <- grid.arrange(grobs=readmission_plots_test, 
-                                      top="30-Day Readmission")
-
-
-ggplot(d_analysis, aes(x = CMR_Index_Readmission)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
-  geom_density(color = "red") +
-  labs(title = "Distribution of CMR_Index_Readmission", x = "Value", y = "Density")
-
-ggplot(d_analysis, aes(x = CMR_Index_Mortality)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
-  geom_density(color = "red") +
-  labs(title = "Distribution of CMR_Index_Mortality", x = "Value", y = "Density")
-
-data <- d_analysis
-outcome <- "readmission_30days_recode_analysis"
-predictor <- "discharge_HOSPITAL_score"
-plot_linear_association <- function(data, outcome, predictors, n_points = 500) {
-  results <- list()
-  logit <- function(pr) log(pr/(1-pr))
-  
-  for (predictor in predictors) {
-    if (is.numeric(data[[predictor]])) {
-      d <- data %>% 
-        drop_na(outcome, predictor)
-      
-      # Create a sequence of n_points between min and max of predictor
-      pred_seq <- seq(min(d[[predictor]]), max(d[[predictor]]), length.out = n_points)
-      
-      # Fit LOESS model
-      loess_model <- loess(d[[outcome]] ~ d[[predictor]])
-      
-      # Predict using the sequence
-      newdata <- data.frame(temp = pred_seq)
-      names(newdata) <- predictor
-      loessfit <- predict(loess_model, newdata = newdata)
-      loessfit <- predict(loess_model, newdata = data.frame(predictor = pred_seq))
-      
-      pi <- pmax(pmin(loessfit, 0.9999), 0.0001)
-      logitfitted <- logit(pi)
-      
-      plot_data <- data.frame(x = pred_seq, y = logitfitted)
-      
-      plot <- ggplot(plot_data, aes(x = x, y = y)) +
-        geom_line() +
-        labs(x = predictor, y = "Logit(Outcome)")
-      
-      results[[predictor]] <- plot
-    }
-  }
-  return(results)
-}
 
 
 summary_to_df <- function(summary_object, fit_name) {
@@ -115,6 +57,8 @@ pivot_tibble <- fits_1_coeff_table %>%
 names(pivot_tibble) <- c("term", "model", "fit1_est", "fit1_se")
 
 
+###################################################################
+# Plotting pairwise comps
 library(multcomp)
 library(ggplot2)
 
@@ -145,3 +89,41 @@ ggplot(plot_data, aes(x = comparison, y = estimate)) +
   labs(x = "Pairwise Comparison", y = "Estimated Difference (log odds)",
        title = "Pairwise Comparisons of Categorical Variable") +
   theme_minimal()
+
+
+
+
+############################################################################################################
+# Creating second set of models
+names(fits_2) <- c("HOSPITAL Readmission", "HOSPITAL Mortality", "NEWS Readmission", "NEWS Mortality")
+names(drop1_list_2) <- names(fits_1)
+
+get_significant_predictors <- function(drop1_result, significance_level = 0.05) {
+  significant_predictors <- rownames(drop1_result)[drop1_result$`Pr(>Chi)` < significance_level]
+  return(significant_predictors)
+}
+
+model_formulas_2 <- lapply(names(fits_1), function(model_name) {
+  significant_predictors <- get_significant_predictors(drop1_list_1[[model_name]])
+  
+  outcome <- strsplit(model_formulas_1[[model_name]], "~")[[1]][1]
+  predictors <- paste(significant_predictors, collapse = " + ")
+  
+  paste0(outcome, "~ ", predictors)
+})
+names(model_formulas_2) <- names(fits_1)
+
+#############################################################################
+# Drop one talbes with diff lengths
+
+drop1_table_2 <- do.call(cbind, lapply(drop1_list_2, function(x) {
+  # Get all unique variable names across all models
+  all_vars <- unique(unlist(lapply(drop1_list_2, function(m) rownames(m))))
+  
+  # Create a named vector with NAs for all variables
+  result <- setNames(rep(NA, length(all_vars)), all_vars)
+  
+  # Fill in the available p-values
+  available_vars <- rownames(x)[-1]  # Exclude the first row (usually the null model)
+  result[available_vars] <- x$`Pr(>Chi)`[-1]
+}))

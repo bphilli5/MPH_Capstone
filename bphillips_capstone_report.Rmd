@@ -9,11 +9,14 @@ output: html_document
 knitr::opts_chunk$set(echo = F)
 source("bphillips_capstone_setup.R")
 source("bphillips_capstone_tables.R")
-# source("bphillips_capstone_aim1.R")
+source("bphillips_capstone_aim1.R")
 # source("bphillips_capstone_aim2.R")
 ```
 
 ## Descriptive Statistic Tables
+
+Problem that median and IQR of some are all 0s??
+Missing data issue?
 
 ```{r final_table}
 final_table
@@ -29,6 +32,7 @@ Readmission Analysis
   mutate(p.value = round(p.value,3)) %>% 
   mutate(deviance = round(deviance,1)))
 ```
+Everything is sufficiently significant to include in the model except trend
 
 Emergency Department Readmission Analysis
 ```{r ed_table_lrt}
@@ -37,6 +41,7 @@ Emergency Department Readmission Analysis
   mutate(p.value = round(p.value,3)) %>% 
   mutate(deviance = round(deviance,1)))
 ```
+NEWS does not appear to be a significant predictor of ED readmission
 
 Mortality Analysis
 ```{r death_table_lrt}
@@ -45,6 +50,8 @@ Mortality Analysis
   mutate(p.value = round(p.value,3)) %>% 
   mutate(deviance = round(deviance,1)))
 ```
+
+
 ```{r readmission_score_comps}
 readmission_score_comps
 ```
@@ -69,6 +76,14 @@ death_score_comps
 plot(readmission_plot_grid)
 ```
 
+```{r discharge_news_score_density, warning=F}
+ggplot(d_analysis, aes(x = discharge_news_score)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
+  geom_density(color = "red") +
+  labs(title = "Distribution of Hospital Trend", x = "Value", y = "Density")
+```
+
+
 ```{r ed_plot_grid}
 plot(ed_plot_grid)
 ```
@@ -76,19 +91,30 @@ plot(ed_plot_grid)
 ```{r death_plot_grid}
 plot(death_plot_grid)
 ```
+```{r}
+# View NEWS correlation matrix
+news_correlation_matrix
+```
 
+
+```{r}
+# # View HOSPITAL correlation matrix
+hospital_correlation_matrix
+```
 Initial HOSPITAL - Readmission Model
 ```{r fits_1_HOSPITAL_Readmission}
 fits_1_summary$`HOSPITAL Readmission`[2:8,] %>% 
   mutate(across(2:5, ~round(.,3)))
 ```
 
-```{r drop1_table_starred_1}
-drop1_table_starred_1[-c(9:12,18),]
+```{r fits_1_vifs}
+fits_1_vifs
 ```
 
 ```{r}
-drop1_table_starred_2[-c(7:10,14),]
+drop1_table_starred_2
+drop1_table_starred_2[-c(4:7,15),]
+
 ```
 
 
@@ -97,10 +123,107 @@ drop1_table_starred_2[-c(7:10,14),]
   mutate(across(2:5, ~round(.,3))))
 ```
 
-```{r}
-# View NEWS correlation matrix
-# view(news_correlation_matrix)
-# 
-# # View HOSPITAL correlation matrix
-# view(hospital_correlation_matrix)
+```{r drop1_table_3_read_starred}
+drop1_table_3_read_starred
 ```
+
+```{r drop1_table_3_death_starred}
+drop1_table_3_death_starred
+```
+
+```{r drop1_table_i_read_starred}
+drop1_table_i_read_starred
+```
+
+
+```{r}
+drop1_table_3_death_starred_i
+```
+
+Trend variables
+```{r}
+mutate(hospital_trend = {
+    x <- c(1, 2, 3)  # Representing the three days
+    y <- c(day_minus_2_HOSPITAL_score,
+           day_minus_1_HOSPITAL_score,
+           discharge_HOSPITAL_score)
+    if (all(!is.na(y))) {
+      coef(lm(y ~ x))[2]  # Slope of the linear regression
+    } else {
+      NA
+    }
+  }) %>%
+  mutate(news_trend = {
+    x <- c(1, 2, 3)  # Representing the three days
+    y <- c(day_minus_2_news_score,
+           day_minus_1_news_score,
+           discharge_news_score)
+    if (all(!is.na(y))) {
+      coef(lm(y ~ x))[2]  # Slope of the linear regression
+    } else {
+      NA
+    }
+  }) %>%
+  ungroup()
+```
+
+Distribution of trend data
+```{r}
+ggplot(d_analysis, aes(x = hospital_trend)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
+  geom_density(color = "red") +
+  labs(title = "Distribution of Hospital Trend", x = "Value", y = "Density")
+
+ggplot(d_analysis, aes(x = news_trend)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
+  geom_density(color = "red") +
+  labs(title = "Distribution of News Trend", x = "Value", y = "Density")
+```
+
+```{r AUROC_interactions}
+for (i in 1:4) {
+  print_results(model_names[i], results[[i]])
+}
+```
+
+```{r AUROC_no_insurance_inte}
+for (i in 1:4) {
+  print_results(paste(model_names[i], "(without insurance interaction)"), results_no_interaction[[i]])
+}
+```
+
+```{r AUROC_comps}
+for (i in 1:4) {
+  cat("Comparing", model_names[i], "with and without insurance interaction:\n")
+  
+  # Function to get fold-specific AUROCs
+  get_fold_aurocs <- function(formula, data, k = 10) {
+    outcome_var <- all.vars(formula)[1]
+    all_vars <- all.vars(formula)
+    complete_data <- data[complete.cases(data[, all_vars]), ]
+    set.seed(123)
+    folds <- createFolds(complete_data[[outcome_var]], k = k, list = TRUE, returnTrain = FALSE)
+    
+    aurocs <- numeric(k)
+    
+    for (j in 1:k) {
+      train <- complete_data[-folds[[j]], ]
+      test <- complete_data[folds[[j]], ]
+      model <- glm(formula, data = train, family = binomial)
+      pred_prob <- predict(model, newdata = test, type = "response")
+      aurocs[j] <- auc(test[[outcome_var]], pred_prob)
+    }
+    
+    return(aurocs)
+  }
+  
+  aurocs_with <- get_fold_aurocs(as.formula(model_formulas_i[[i]]), d_analysis)
+  aurocs_without <- get_fold_aurocs(model_formulas_no_interaction[[i]], d_analysis)
+  
+  t_test_result <- t.test(aurocs_with, aurocs_without, paired = TRUE)
+  print(t_test_result)
+  cat("\n")
+}
+
+```
+
