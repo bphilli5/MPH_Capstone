@@ -67,10 +67,10 @@ d_analysis <- d_tables %>%
     patient_class_analysis,
     facility_name_analysis,
     # Numeric predictors
-    age_at_encounter,
     # los_in_hours,
     CMR_Index_Readmission,
-    CMR_Index_Mortality
+    CMR_Index_Mortality,
+    age_at_encounter
          ) %>% 
 
   drop_na(  
@@ -169,21 +169,11 @@ d_analysis <- d_tables %>%
 all_variables <- names(d_analysis)
 outcome_variables <- names(d_analysis)[1:3]
 score_variables <- names(d_analysis)[4:13]
-score_variable_factor <- names(d_analysis)[28:35]
-score_variable_quantile <- names(d_analysis)[36:43]
-score_variable_averages <- names(d_analysis)[44:45]
-score_variable_trend <- names(d_analysis)[46:47]
-predictors <- names(d_analysis)[14:27]
-# Removing LOS based on clinical irrelevance of results
-predictors_1 <- predictors[-12]
-hospital_variables <- data.frame(
-  variable = c(score_variables[1:5],
-               predictors)
-)
-news_variables <- data.frame(
-  variable = c(score_variables[6:10],
-               predictors)
-)
+score_variable_factor <- names(d_analysis)[27:34]
+score_variable_quantile <- names(d_analysis)[35:42]
+score_variable_averages <- names(d_analysis)[43:44]
+score_variable_trend <- names(d_analysis)[45:46]
+predictors <- names(d_analysis)[14:26]
 
 hospital_scores <- c(score_variables[1:5],
                      score_variable_factor[1:4],
@@ -196,6 +186,15 @@ news_scores <- c(score_variables[6:10],
                  score_variable_quantile[5:8],
                  score_variable_averages[2],
                  score_variable_trend[2])
+
+hospital_variables <- data.frame(
+  variable = c(hospital_scores,
+               predictors)
+)
+news_variables <- data.frame(
+  variable = c(news_scores,
+               predictors)
+)
 
 ###############################################################################
 # Step 3: Bivariate analysis
@@ -238,24 +237,18 @@ readmission_table_models <- do.call(rbind, readmission_results$model)
 ed_table_models <- do.call(rbind, ed_results$model)
 death_table_models <- do.call(rbind, death_results$model)
 
-# Create LRT tables and view
+# Create LRT tables
 readmission_table_lrt <- do.call(rbind, readmission_results$lrt)
+ed_table_lrt <- do.call(rbind, ed_results$lrt)
+death_table_lrt <- do.call(rbind, death_results$lrt)
 
 # Based on the results of the bivariate analysis, ICU_category can be removed
 # from models of readmission risk
 read_predictors <- read_predictors[-6]
 
-ed_table_lrt <- do.call(rbind, ed_results$lrt)
-
-
-# Removing several predictors based on results
-ed_predictors <- ed_predictors[-c(19,26)]
 
 # Based on the results of bivariate analysis, NEWS2 doe not appear to be a 
 # significant predictor of ED readmission
-news_scores_ed <- NA
-
-death_table_lrt <- do.call(rbind, death_results$lrt)
 
 
 # Removing ethnicity as a predictor
@@ -322,20 +315,6 @@ death_score_comps <- death_score_comps[-c(4,7,10)] %>%
          across(c(3,5,7,9), ~round(.,4))
   )
 
-# For HOSPITAL scores, the numeric version of the variable produces a better
-# fit in all scenarios except admission
-hospital_scores_death <- hospital_scores[-c(4,6:8,10:13)]
-# For NEWS2 scores, the factor version of the variable produces a better fit in
-# all scenarios except admission
-news_scores_death <- news_scores[-c(1:3,9:13)]
-
-hospital_scores_1 <- c(score_variables[1:5],
-                     score_variable_averages[1],
-                     score_variable_trend[1])
-
-news_scores_1 <- c(score_variables[6:10],
-                 score_variable_averages[2],
-                 score_variable_trend[2])
 
 ###############################################################################
 # Step 5: Bivariate analysis with payor category
@@ -479,8 +458,6 @@ death_plot_grid <- grid.arrange(grobs=death_plots_test,
 # death_log_plot_grid <- grid.arrange(grobs=death_log_plots, 
 #                                     top="30-Day Death - Log")
 
-# Based on the curves, a smoothing term will be added to account for non-linearity
-# in age
 
 
 ###############################################################################
@@ -514,11 +491,23 @@ hospital_correlation_matrix <- round(cor(hospital_numeric_subset,
 ###############################################################################
 # Step 5: Creating simple additive models
 ###############################################################################
+# Based on the results of the bivariate analysis and scoring comps, averages
+# and trend scores will be removed from the models
+
+hospital_scores_1 <- c(score_variables[1:4])
+
+news_scores_1 <- c(score_variables[6:9])
+
+# Based on the curves, a smoothing term will be added to account for non-linearity
+# in age in readmission models
+
+predictors_1 <- c(predictors[-13], "ns(age_at_encounter, df = 3)")
+
 model_formulas_1 <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
                           paste(hospital_scores_1, collapse = " + "),
                           " + ",
-                          paste(predictors, collapse = " + ")),
+                          paste(predictors_1, collapse = " + ")),
   # hospital_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[1:5], collapse = " + "),
   #                             " + ",
@@ -530,7 +519,7 @@ model_formulas_1 <- list(
   news_read <- paste0("readmission_30days_recode_analysis ~ ",
                           paste(news_scores_1, collapse = " + "),
                       " + ",
-                          paste(predictors, collapse = " + ")),
+                          paste(predictors_1, collapse = " + ")),
   # news_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[6:10], collapse = " + "),
   #                         " + ",
@@ -541,17 +530,15 @@ model_formulas_1 <- list(
                            paste(predictors, collapse = " + "))
 )
 
+
 fits_1 <- lapply(model_formulas_1, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
 
-fits_1_summary <- lapply( fits_1, function(fit) {
-  tidy(fit)
+fits_1_vifs <- lapply(fits_1, function(fit) {
+  vif(fit)
 })
 
-fits_1_aic <- lapply(fits_1, function(fit) {
-  fit$aic
-})
 ###############################################################################
 # Step 7: Type III Testing
 ###############################################################################
@@ -582,9 +569,6 @@ table_row_names <- c("Discharge Score",
                      "D-1 Score",
                      "D-2 Score",
                      "Admission Score",
-                     "Average Score",
-                     "Discharge Average",
-                     "Trend",
                      "Payor Category",
                      "Sex",
                      "Race",
@@ -595,9 +579,9 @@ table_row_names <- c("Discharge Score",
                      "Discharge Service",
                      "Patient Class",
                      "Facility Name",
-                     "Age",
                      "CMR Readmission Index",
-                     "CMR Mortality Index")
+                     "CMR Mortality Index",
+                     "Age")
 
 table_column_names <- c("HOSPITAL Readmission", 
                         # "HOSPITAL ED Visit",
@@ -609,19 +593,17 @@ table_column_names <- c("HOSPITAL Readmission",
 rownames(drop1_table_starred_1) <- table_row_names
 colnames(drop1_table_starred_1) <- table_column_names
 
-
 ###############################################################################
 # Applying drop1 resutls
 
-hospital_scores_2 <- hospital_scores_1[-c(5:6)]
-news_scores_2 <- news_scores_1[-c(5:6)]
-predictors_2 <- predictors_1[-c(6,9,13)]
+hospital_scores_2 <- hospital_scores_1[c(1,4)]
+news_scores_2 <- news_scores_1[c(1,4)]
 
 model_formulas_2 <- list(
   hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
                           paste(hospital_scores_2, collapse = " + "),
                           " + ",
-                          paste(predictors_2, collapse = " + ")),
+                          paste(predictors_1, collapse = " + ")),
   # hospital_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[2:5], collapse = " + "),
   #                             " + ",
@@ -629,11 +611,11 @@ model_formulas_2 <- list(
   hospital_death <- paste0("death_30_days_analysis ~ ",
                            paste(hospital_scores_2, collapse = " + "),
                            " + ",
-                           paste(predictors_2, collapse = " + ")),
+                           paste(predictors, collapse = " + ")),
   news_read <- paste0("readmission_30days_recode_analysis ~ ",
                       paste(news_scores_2, collapse = " + "),
                       " + ",
-                      paste(predictors_2, collapse = " + ")),
+                      paste(predictors_1, collapse = " + ")),
   # news_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[6:20], collapse = " + "),
   #                         " + ",
@@ -641,22 +623,20 @@ model_formulas_2 <- list(
   news_death <- paste0("death_30_days_analysis ~ ",
                        paste(news_scores_2, collapse = " + "),
                        " + ",
-                       paste(predictors_2, collapse = " + "))
+                       paste(predictors, collapse = " + "))
 )
 
 fits_2 <- lapply(model_formulas_2, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
 
-fits_2_summary <- lapply( fits_2, function(fit) {
+fits_2_summary <- lapply(fits_2, function(fit) {
   tidy(fit)
 })
 
 fits_2_aic <- lapply(fits_2, function(fit) {
   fit$aic
 })
-
-
 
 drop1_list_2 <- lapply(fits_2, function(fit) {
   drop1(fit, test = "LRT")
@@ -679,26 +659,108 @@ drop1_table_starred_2 <- apply(drop1_table_2, 2, function(x) {
 
 # Naming tables
 table_row_names <- c("Discharge Score",
-                     "D-1 Score",
-                     "D-2 Score",
                      "Admission Score",
-                     "Trend",
                      "Payor Category",
                      "Sex",
                      "Race",
                      "Ethnicity",
                      "Primary Language",
+                     "Visited ICU",
                      "Discharge Disposition",
                      "Discharge Service",
+                     "Patient Class",
                      "Facility Name",
-                     "Age",
-                     "CMR Readmission Index")
+                     "CMR Readmission Index",
+                     "CMR Mortality Index",
+                     "Age")
 
 
 rownames(drop1_table_starred_2) <- table_row_names
 colnames(drop1_table_starred_2) <- table_column_names
-view(drop1_table_starred_2)
 
+
+
+###############################################################################
+# Third round of models
+
+read_predictors <- predictors_1[-c(6,12)]
+death_predictors <- predictors[-12]
+
+
+model_formulas_3 <- list(
+  hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
+                          paste(hospital_scores_2, collapse = " + "),
+                          " + ",
+                          paste(read_predictors, collapse = " + ")),
+
+  hospital_death <- paste0("death_30_days_analysis ~ ",
+                           paste(hospital_scores_2, collapse = " + "),
+                           " + ",
+                           paste(death_predictors, collapse = " + ")),
+  news_read <- paste0("readmission_30days_recode_analysis ~ ",
+                      paste(news_scores_2, collapse = " + "),
+                      " + ",
+                      paste(read_predictors, collapse = " + ")),
+
+  news_death <- paste0("death_30_days_analysis ~ ",
+                       paste(news_scores_2, collapse = " + "),
+                       " + ",
+                       paste(death_predictors, collapse = " + "))
+)
+
+fits_3 <- lapply(model_formulas_3, function(formula) {
+  glm(formula, data = d_analysis, family = binomial)
+})
+
+fits_3_summary <- lapply(fits_3, function(fit) {
+  tidy(fit)
+})
+
+fits_3_aic <- lapply(fits_3, function(fit) {
+  fit$aic
+})
+
+drop1_list_3 <- lapply(fits_3, function(fit) {
+  drop1(fit, test = "LRT")
+})
+
+
+drop1_table_read <- round(cbind(drop1_list_3[[1]]$`Pr(>Chi)`[-1],
+                          drop1_list_3[[3]]$`Pr(>Chi)`[-1]),3)
+
+# Including significance in tables
+drop1_table_3_read_starred <- apply(drop1_table_read, 2, function(x) {
+  case_when(
+    x >= 0.1 ~ as.character(round(x, 3)),
+    x >= 0.05 ~ paste0(round(x, 3), " -"),
+    x >= 0.01 ~ paste0(round(x, 3), " **"),
+    x >= 0.001 ~ paste0(round(x, 3), " ***"),
+    TRUE ~ "<0.001 ****"
+  )
+})
+
+rownames(drop1_table_3_read_starred) <- c(hospital_scores_2, read_predictors)
+colnames(drop1_table_3_read_starred) <- c("HOSPITAL Readmission", "NEWS Readmission")
+
+drop1_table_death <- round(cbind(drop1_list_3[[2]]$`Pr(>Chi)`[-1],
+                                drop1_list_3[[4]]$`Pr(>Chi)`[-1]),3)
+
+# Including significance in tables
+drop1_table_3_death_starred <- apply(drop1_table_death, 2, function(x) {
+  case_when(
+    x >= 0.1 ~ as.character(round(x, 3)),
+    x >= 0.05 ~ paste0(round(x, 3), " -"),
+    x >= 0.01 ~ paste0(round(x, 3), " **"),
+    x >= 0.001 ~ paste0(round(x, 3), " ***"),
+    TRUE ~ "<0.001 ****"
+  )
+})
+
+rownames(drop1_table_3_death_starred) <- c(hospital_scores_2, death_predictors)
+colnames(drop1_table_3_death_starred) <- c("HOSPITAL death", "NEWS death")
+
+###############################################################################
+# Comparing the first and second models
 
 names(fits_1_aic) <- table_column_names
 names(fits_1_summary) <- table_column_names
@@ -712,75 +774,120 @@ fits_1_2_aic <- data.frame(
 
 fits_1_2_aic$delta <- fits_1_2_aic$AIC2 - fits_1_2_aic$AIC1
 
+###############################################################################
+# Comparing the first and second models
 
+names(fits_1_aic) <- table_column_names
+names(fits_1_summary) <- table_column_names
+names(fits_2_aic) <- table_column_names
+names(fits_2_summary) <- table_column_names
 
+fits_1_2_aic <- data.frame(
+  AIC1 = unlist(fits_1_aic),
+  AIC2 = unlist(fits_2_aic)
+)
 
+fits_1_2_aic$delta <- fits_1_2_aic$AIC2 - fits_1_2_aic$AIC1
 
+###############################################################################
+# Fitting the interactive models
+hospital_scores_i <- hospital_scores_2
+news_scores_i <- news_scores_2
+read_predictors_i <- read_predictors
+death_predictors_i <- death_predictors
 
+model_formulas_i <- list(
+  hospital_read <- paste0("readmission_30days_recode_analysis ~ ",
+                          paste(c(hospital_scores_i[1],
+                                  read_predictors_i[1])
+                                  , collapse = " * "),
+                          " + ",
+                          paste(hospital_scores_i[-1]
+                                , collapse = " + "),
+                          " + ",
+                          paste(read_predictors_i[-1], collapse = " + ")),
+  
+  hospital_death <- paste0("death_30_days_analysis ~ ",
+                           paste(c(hospital_scores_i[1],
+                                   death_predictors_i[1])
+                                 , collapse = " * "),
+                           " + ",
+                           paste(hospital_scores_i[-1]
+                                 , collapse = " + "),
+                           " + ",
+                           paste(death_predictors_i[-1], collapse = " + ")),
+  
+  news_read <- paste0("readmission_30days_recode_analysis ~ ",
+                      paste(c(news_scores_i[1],
+                              read_predictors_i[1])
+                            , collapse = " * "),
+                      " + ",
+                      paste(news_scores_i[-1]
+                            , collapse = " + "),
+                      " + ",
+                      paste(read_predictors_i[-1], collapse = " + ")),
+  
+  news_death <- paste0("death_30_days_analysis ~ ",
+                       paste(c(news_scores_i[1],
+                               death_predictors_i[1])
+                             , collapse = " * "),
+                       " + ",
+                       paste(news_scores_i[-1]
+                             , collapse = " + "),
+                       " + ",
+                       paste(death_predictors_i[-1], collapse = " + "))
+  )
 
+fits_i <- lapply(model_formulas_i, function(formula) {
+  glm(formula, data = d_analysis, family = binomial)
+})
 
-###
-# VIFs
-###
-fit_1_vifs <- lapply(fits_1, function(x) vif(x))
+fits_i_summary <- lapply(fits_i, function(fit) {
+  tidy(fit)
+})
 
-fit_i_vifs <- lapply(fits_i, function(x) vif(x))
+fits_i_aic <- lapply(fits_i, function(fit) {
+  fit$aic
+})
 
+drop1_list_i <- lapply(fits_i, function(fit) {
+  drop1(fit, test = "LRT")
+})
 
-read_predictors <- c(read_predictors, "s(age_at_encounter)")
-ed_predictors <- c(ed_predictors, "s(age_at_encounter)")
-death_predictors <- c(death_predictors, "s(age_at_encounter)")
+drop1_table_read_i <- round(cbind(drop1_list_i[[1]]$`Pr(>Chi)`[-1],
+                                  drop1_list_i[[3]]$`Pr(>Chi)`[-1]),3)
 
+# Including significance in tables
+drop1_table_i_read_starred <- apply(drop1_table_read_i, 2, function(x) {
+  case_when(
+    x >= 0.1 ~ as.character(round(x, 3)),
+    x >= 0.05 ~ paste0(round(x, 3), " -"),
+    x >= 0.01 ~ paste0(round(x, 3), " **"),
+    x >= 0.001 ~ paste0(round(x, 3), " ***"),
+    TRUE ~ "<0.001 ****"
+  )
+})
 
-# ###############################################################################
-# # Step 6: Fitting the interactive models
-# ###############################################################################
-# 
-# model_formulas_i <- list(
-#   hospital_read <- paste0(
-#     "readmission_30days_recode_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(hospital_variables$variable[2:length(hospital_variables$variable)], collapse = " + ")),
-#   hospital_ed_visit <- paste0(
-#     "ed_30days_recode_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(hospital_variables$variable[2:length(hospital_variables$variable)], collapse = " + ")),
-#   hospital_death <- paste0(
-#     "death_30_days_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(hospital_variables$variable[2:length(hospital_variables$variable)], collapse = " + ")),
-#   news_readmission = paste0(
-#     "readmission_30days_recode_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(news_variables$variable[2:length(hospital_variables$variable)], collapse = " + ")),
-#   news_ed_visit = paste0(
-#     "ed_30days_recode_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(news_variables$variable[2:length(hospital_variables$variable)], collapse = " + ")),
-#   news_death = paste0(
-#     "death_30_days_analysis ~ discharge_HOSPITAL_score * ",
-#     paste(news_variables$variable[2:length(hospital_variables$variable)], collapse = " + "))
-# )
-# 
-# fits_i <- lapply(model_formulas_i, function(formula) {
-#   glm(formula, data = d_analysis, family = binomial)
-# })
-# 
-# # Interatctive model Type III testing
-# # Perform drop1() on each model fit
-# drop1_list_i <- lapply(fits_i, function(fit) {
-#   drop1(fit, test = "LRT")
-# })
-# 
-# # Creating a table of p-values from the Type III tests
-# drop1_table_i <- do.call(cbind, lapply(drop1_list_i, function(x) x$`Pr(>Chi)`[-1]))
-# 
-# # Including significance in tables
-# drop1_table_starred_i <- apply(drop1_table_i, 2, function(x) {
-#   case_when(
-#     x >= 0.1 ~ as.character(round(x, 3)),
-#     x >= 0.05 ~ paste0(round(x, 3), " -"),
-#     x >= 0.01 ~ paste0(round(x, 3), " **"),
-#     x >= 0.001 ~ paste0(round(x, 3), " ***"),
-#     TRUE ~ "<0.001 ****"
-#   )
-# })
-# 
-# rownames(drop1_table_starred_i) <- table_row_names[3:length(table_row_names)]
-# colnames(drop1_table_starred_i) <- table_column_names
-# view(drop1_table_starred_i)
+rownames(drop1_table_i_read_starred) <- c(hospital_scores_2[-1], 
+                                          read_predictors[-1], 
+                                          "*")
+colnames(drop1_table_i_read_starred) <- c("HOSPITAL Readmission", "NEWS Readmission")
+
+drop1_table_death_i <- round(cbind(drop1_list_i[[2]]$`Pr(>Chi)`[-1],
+                                   drop1_list_i[[4]]$`Pr(>Chi)`[-1]),3)
+
+# Including significance in tables
+drop1_table_3_death_starred_i <- apply(drop1_table_death_i, 2, function(x) {
+  case_when(
+    x >= 0.1 ~ as.character(round(x, 3)),
+    x >= 0.05 ~ paste0(round(x, 3), " -"),
+    x >= 0.01 ~ paste0(round(x, 3), " **"),
+    x >= 0.001 ~ paste0(round(x, 3), " ***"),
+    TRUE ~ "<0.001 ****"
+  )
+})
+
+rownames(drop1_table_3_death_starred_i) <- c(hospital_scores_2[-1], 
+                                             death_predictors[-1],
+                                             "*")
+colnames(drop1_table_3_death_starred_i) <- c("HOSPITAL death", "NEWS death")
