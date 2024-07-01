@@ -7,21 +7,40 @@ output: html_document
 
 ```{r setup, include=F, message= F}
 knitr::opts_chunk$set(echo = F)
-source("bphillips_capstone_setup.R")
-source("bphillips_capstone_tables.R")
-source("bphillips_capstone_aim1.R")
+# source("bphillips_capstone_setup.R")
+# source("bphillips_capstone_tables.R")
+# source("bphillips_capstone_aim1.R")
 # source("bphillips_capstone_aim2.R")
 ```
 
 ## Descriptive Statistic Tables
 
-Problem that median and IQR of some are all 0s??
-Missing data issue?
-
 ```{r final_table}
 final_table
 ```
 
+
+```{r discharge_hospital_score_hist, warning=F}
+ggplot(d_analysis, aes(x = discharge_HOSPITAL_score)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
+  labs(title = "Distribution of Discharge HOSPITAL Scores", 
+       x = "Value", y = "Density")
+```
+
+```{r discharge_news_score_hist, warning=F}
+ggplot(d_analysis, aes(x = discharge_news_score)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
+  labs(title = "Distribution of Discharge NEWS2 Scores", 
+       x = "Value", y = "Density")
+```
+
+```{r age_density, warning=F}
+ggplot(d_analysis, aes(x = age_at_encounter)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
+  geom_density(color = "red") +
+  labs(title = "Distribution of Age", 
+       x = "Value", y = "Density")
+```
 
 ## Bivariate Analysis with Outcomes
 
@@ -51,23 +70,36 @@ Mortality Analysis
   mutate(deviance = round(deviance,1)))
 ```
 
+All non-demographics are significant predictors of mortality
 
 ```{r readmission_score_comps}
 readmission_score_comps
 ```
 
+The numeric version of HOSPITAL scoring is a more significant predictor of readmission compared to the factor and quantile versions in nearly all cases, indicating that HOSPITAL scores should be modeled numerically.
+
+The score averages do not produce a better fit than discharge scores, indicating that the discharge score is the best predictor of readmission.
+
 ```{r ed_score_comps}
 ed_score_comps
 ```
+
+The numeric version of HOSPITAL scoring is a more significant predictor of ED readmission compared to the factor and quantile versions in nearly all cases, indicating that HOSPITAL scores should be modeled numerically.
+
+The score averages do not produce a better fit than discharge scores, indicating that the discharge score is the best predictor of ED readmission.
 
 ```{r death_score_comps}
 death_score_comps
 ```
 
+The numeric version of HOSPITAL scoring is a more significant predictor of mortality compared to the factor and quantile versions in nearly all cases, indicating that HOSPITAL scores should be modeled numerically.
+
+The score averages do not produce a better fit than discharge scores, indicating that the discharge score is the best predictor of mortality.
+
 ```{r payor_bivariate_table}
 (payor_bivariate_table <- payor_bivariate_table %>% 
   mutate(statistic = round(statistic,1),
-         p.value = round(p.value,4)
+         p.value = round(p.value,5)
   )
 )
 ```
@@ -76,46 +108,56 @@ death_score_comps
 plot(readmission_plot_grid)
 ```
 
-```{r discharge_news_score_density, warning=F}
-ggplot(d_analysis, aes(x = discharge_news_score)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black") +
-  geom_density(color = "red") +
-  labs(title = "Distribution of Hospital Trend", x = "Value", y = "Density")
-```
+Plotting the numeric variables against the logit of readmission indicates a linear relationship between the HOSPITAL variables and the logit of readmission. 
 
+The plot of NEWS2 scores indicates a modestly positive relationship with some abnormality over NEWS==10. However, these make up a smalle fraction of overall NEWS2 scores, as seen below. 
+
+The plot of age appears non-linear and splines will be fitted to assess the significance of the non-linear relationship.
+
+Approximate linearity in the CMR indicies validates the assumption of linearity.
 
 ```{r ed_plot_grid}
 plot(ed_plot_grid)
 ```
 
+Plotting the numeric variables against the logit of ED readmission indicates a linear relationship between the HOSPITAL variables and the logit of ED readmission. 
+
+NEWS2 scores have already been determined to not be significant predictors of ED readmission.
+
+The plot of age at encounter indicates that the factors governing ED readmission risk are likely not physiological. Given this, it is unlikely that analyzing the association between physiological scores and risk of ED readmission will yield relevant results.
+
 ```{r death_plot_grid}
 plot(death_plot_grid)
 ```
-```{r}
-# View NEWS correlation matrix
-news_correlation_matrix
-```
 
+Low scores producing much lower and higher odds of death for HOSPITAL and NEWS2 scores respectively is a counterintuitive result that will be explored later in the analysis.
 
 ```{r}
 # # View HOSPITAL correlation matrix
 hospital_correlation_matrix
 ```
-Initial HOSPITAL - Readmission Model
-```{r fits_1_HOSPITAL_Readmission}
-fits_1_summary$`HOSPITAL Readmission`[2:8,] %>% 
-  mutate(across(2:5, ~round(.,3)))
+Relatively high correlations among several of the HOSPITAL scores is expected, but indicates that it is unlikely that they can all be included in a single model without variance inflation.
+
+```{r}
+# View NEWS correlation matrix
+news_correlation_matrix
 ```
 
+High correlations among several of the NEWS2 scores is expected, but indicates that it is unlikely that they can all be included in a single model without variance inflation.
+
+## Initial HOSPITAL - Readmission Model
 ```{r fits_1_vifs}
 fits_1_vifs
 ```
 
+Initial models were fitted with all scores to determine the extent of variance inflation. While the variance inflation factors for NEWS2 scores are not high enough to warrant exclusion, those for HOSPITAL scores are. Therefore, the next round of models will include only discharge and admission scores.
+
 ```{r}
 drop1_table_starred_2
-drop1_table_starred_2[-c(4:7,15),]
+# drop1_table_starred_2[-c(4:7,15),]
 
 ```
+
 
 
 ```{r}
@@ -123,9 +165,27 @@ drop1_table_starred_2[-c(4:7,15),]
   mutate(across(2:5, ~round(.,3))))
 ```
 
+```{r}
+(fits_2_summary$`HOSPITAL Death` %>% 
+  mutate(across(2:5, ~round(.,3))))
+```
+
+```{r}
+(fits_2_summary$`NEWS Readmission` %>% 
+  mutate(across(2:5, ~round(.,3))))
+```
+
+```{r}
+(fits_2_summary$`NEWS Death` %>% 
+  mutate(across(2:5, ~round(.,3))))
+```
+
+
 ```{r drop1_table_3_read_starred}
 drop1_table_3_read_starred
 ```
+
+At this point, all variables in the model are significant predictors aside from the demographic control variables that will be included for consistency across the literature.
 
 ```{r drop1_table_3_death_starred}
 drop1_table_3_death_starred
@@ -140,90 +200,36 @@ drop1_table_i_read_starred
 drop1_table_3_death_starred_i
 ```
 
-Trend variables
+In both cases, the interaction term is non-significant indicating that insurance status is not an effect modifier for the association between physiological scores and readmission/death within 30 days.
+
+```{r ROC_summary_table}
+# Print tables
+print(ROC_summary_table)
+```
+
+
+```{r ROC_plot_grid}
+print(ROC_plot_grid)
+```
+
+
 ```{r}
-mutate(hospital_trend = {
-    x <- c(1, 2, 3)  # Representing the three days
-    y <- c(day_minus_2_HOSPITAL_score,
-           day_minus_1_HOSPITAL_score,
-           discharge_HOSPITAL_score)
-    if (all(!is.na(y))) {
-      coef(lm(y ~ x))[2]  # Slope of the linear regression
-    } else {
-      NA
-    }
-  }) %>%
-  mutate(news_trend = {
-    x <- c(1, 2, 3)  # Representing the three days
-    y <- c(day_minus_2_news_score,
-           day_minus_1_news_score,
-           discharge_news_score)
-    if (all(!is.na(y))) {
-      coef(lm(y ~ x))[2]  # Slope of the linear regression
-    } else {
-      NA
-    }
-  }) %>%
-  ungroup()
+# Print summary tables and save plot grids for each insurance category
+for (insurance in insurance_categories) {
+  cat("\nSummary Table for", insurance, "Insurance:\n")
+  print(results_by_insurance[[insurance]]$summary_table)
+}
 ```
 
-Distribution of trend data
 ```{r}
-ggplot(d_analysis, aes(x = hospital_trend)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
-  geom_density(color = "red") +
-  labs(title = "Distribution of Hospital Trend", x = "Value", y = "Density")
-
-ggplot(d_analysis, aes(x = news_trend)) +
-  geom_histogram(aes(y = after_stat(density)), binwidth = .5, fill = "lightblue", color = "black") +
-  geom_density(color = "red") +
-  labs(title = "Distribution of News Trend", x = "Value", y = "Density")
+plot(plot_grids[["Commercial"]])
 ```
 
-```{r AUROC_interactions}
-for (i in 1:4) {
-  print_results(model_names[i], results[[i]])
-}
+```{r}
+plot(plot_grids[["Medicare"]])
 ```
 
-```{r AUROC_no_insurance_inte}
-for (i in 1:4) {
-  print_results(paste(model_names[i], "(without insurance interaction)"), results_no_interaction[[i]])
-}
-```
-
-```{r AUROC_comps}
-for (i in 1:4) {
-  cat("Comparing", model_names[i], "with and without insurance interaction:\n")
-  
-  # Function to get fold-specific AUROCs
-  get_fold_aurocs <- function(formula, data, k = 10) {
-    outcome_var <- all.vars(formula)[1]
-    all_vars <- all.vars(formula)
-    complete_data <- data[complete.cases(data[, all_vars]), ]
-    set.seed(123)
-    folds <- createFolds(complete_data[[outcome_var]], k = k, list = TRUE, returnTrain = FALSE)
-    
-    aurocs <- numeric(k)
-    
-    for (j in 1:k) {
-      train <- complete_data[-folds[[j]], ]
-      test <- complete_data[folds[[j]], ]
-      model <- glm(formula, data = train, family = binomial)
-      pred_prob <- predict(model, newdata = test, type = "response")
-      aurocs[j] <- auc(test[[outcome_var]], pred_prob)
-    }
-    
-    return(aurocs)
-  }
-  
-  aurocs_with <- get_fold_aurocs(as.formula(model_formulas_i[[i]]), d_analysis)
-  aurocs_without <- get_fold_aurocs(model_formulas_no_interaction[[i]], d_analysis)
-  
-  t_test_result <- t.test(aurocs_with, aurocs_without, paired = TRUE)
-  print(t_test_result)
-  cat("\n")
-}
-
+```{r}
+plot(plot_grids[["Medicaid"]])
 ```
 
