@@ -3,11 +3,11 @@
 #> Creating descriptive statistics tables
 ###############################################################################
 
-#> Step 1: Variable recoding and selection
-#> Step 2: Sorting tables
-#> Step 3: Creating categorical variable table
+#> Step 1: Categorical variable recoding + variable selection 
+#> Step 2: Setting up the sorting of the tables
+#> Step 3: Creating the categorical variable table
 #> Step 4: Creating numeric variable table
-#> Step 5: Overall figures
+#> Step 5: Overall figures and payor stata counts
 
 ###############################################################################
 # Step 1: Categorical variable recoding + variable selection 
@@ -27,7 +27,20 @@ d_tables <- d_sas %>%
            ethnicity == "Patient Unable to Answer" ~ "Unknown",
            ethnicity == "*Unspecified" ~ "Unknown",
            ethnicity == "" ~ "Unknown",
-           TRUE ~ ethnicity)) %>% 
+           TRUE ~ ethnicity),
+         # Process CMR indices
+         CMR_Index_Readmission_Zero = if_else(CMR_Index_Readmission == 0,
+                                              "Yes",
+                                              "No"),
+         CMR_Index_Readmission_NonZero = if_else(CMR_Index_Readmission > 0, 
+                                                 CMR_Index_Readmission, 
+                                                 NA_real_),
+         CMR_Index_Mortality_Zero = if_else(CMR_Index_Mortality == 0,
+                                            "Yes",
+                                            "No"),
+         CMR_Index_Mortality_NonZero = if_else(CMR_Index_Mortality > 0, 
+                                               CMR_Index_Mortality, 
+                                               NA_real_)) %>% 
   
   select(
     # Outcomes
@@ -59,9 +72,12 @@ d_tables <- d_sas %>%
     # Numeric predictors
     age_at_encounter,
     los_in_hours,
-    CMR_Index_Readmission,
-    CMR_Index_Mortality
-    ) %>% 
+    # Processed CMR indices
+    CMR_Index_Readmission_Zero,
+    CMR_Index_Readmission_NonZero,
+    CMR_Index_Mortality_Zero,
+    CMR_Index_Mortality_NonZero
+  ) %>% 
   
   filter(
     age_at_encounter < 110
@@ -95,9 +111,11 @@ variables_ordered <- c("readmission_30days_recode",
                        "patient_class",
                        "facility_name",
                        "los_in_hours",
-                       "CMR_Index_Readmission",
-                       "CMR_Index_Mortality"
-                       )
+                       "CMR_Index_Readmission_Zero",
+                       "CMR_Index_Readmission_NonZero",
+                       "CMR_Index_Mortality_Zero",
+                       "CMR_Index_Mortality_NonZero"
+)
 
 table_value_order <- c("Yes",
                        "No",
@@ -149,7 +167,9 @@ categorical_table <- d_tables %>%
          dc_disp_category,
          discharge_service,
          patient_class,
-         facility_name) %>%
+         facility_name,
+         CMR_Index_Readmission_Zero,
+         CMR_Index_Mortality_Zero) %>%
   
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
   group_by(payor_category, variable, value) %>% 
@@ -181,21 +201,22 @@ numeric_table <- d_tables %>%
          discharge_HOSPITAL_score,
          discharge_news_score,
          los_in_hours,
-         CMR_Index_Readmission,
-         CMR_Index_Mortality) %>% 
+         CMR_Index_Readmission_NonZero,
+         CMR_Index_Mortality_NonZero) %>% 
   pivot_longer(-payor_category, names_to = "variable", values_to = "value") %>% 
   group_by(payor_category, variable) %>% 
   summarise(
     med = round(median(value, na.rm = TRUE), 1),
-    iqr = round(IQR(value, na.rm = TRUE), 1)
+    q25 = round(quantile(value, 0.25, na.rm = TRUE), 1),
+    q75 = round(quantile(value, 0.75, na.rm = TRUE), 1)
   ) %>% 
-  mutate(result = paste0(med, " (", iqr, ")")) %>% 
-  select(-med, -iqr) %>% 
+  mutate(result = paste0(med, " (", q25, "-", q75, ")")) %>% 
+  select(-med, -q25, -q75) %>% 
   pivot_wider(names_from = payor_category, 
-              values_from = result, values_fill = "0 (0)")
+              values_from = result, values_fill = "N/A")
 
 ###############################################################################
-# Step 4: Overall figures and payor stata counts
+# Step 5: Overall figures and payor stata counts
 ###############################################################################
 # Payor strata counts
 payor_cats <- unique(d_tables$payor_category)
@@ -208,9 +229,10 @@ var_names <- names(d_tables)
 overall_figures <- list()
 for (var in var_names) {
   if (is.numeric(d_tables[[var]])) {
-    avg <- round(median(d_tables[[var]], na.rm=TRUE), 2)
-    sd <- round(IQR(d_tables[[var]], na.rm=TRUE), 2)
-    overall_figures[[var]] <- paste0(avg, " (", sd, ")")
+    med <- round(median(d_tables[[var]], na.rm=TRUE), 2)
+    q25 <- round(quantile(d_tables[[var]], 0.25, na.rm=TRUE), 2)
+    q75 <- round(quantile(d_tables[[var]], 0.75, na.rm=TRUE), 2)
+    overall_figures[[var]] <- paste0(med, " (", q25, "-", q75, ")")
   }
   else if (is.character(d_tables[[var]])) {
     names <- unique(d_tables[[var]])
@@ -292,9 +314,11 @@ combined_table["Overall"] <- c(
   overall_figures$facility_name['YVMC'],
   overall_figures$facility_name['CHCO AT MHN HOSPITAL'],
   overall_figures$los_in_hours,
-  overall_figures$CMR_Index_Mortality,
-  overall_figures$CMR_Index_Readmission
-  )
+  overall_figures$CMR_Index_Readmission_Zero,
+  overall_figures$CMR_Index_Readmission_NonZero,
+  overall_figures$CMR_Index_Mortality_Zero,
+  overall_figures$CMR_Index_Mortality_NonZero
+)
 
 final_table <- combined_table[,c(1,2,10,6,3,5,9,4,8,7)] %>% 
   mutate(variable = case_when(
@@ -310,8 +334,10 @@ final_table <- combined_table[,c(1,2,10,6,3,5,9,4,8,7)] %>%
     variable == "discharge_service" ~ "Discharge Service",
     variable == "patient_class" ~ "Patient Class",
     variable == "facility_name" ~ "Facility",
-    variable == "CMR_Index_Mortality" ~ "CMR Mortality Index",
-    variable == "CMR_Index_Readmission" ~ "CMR Readmission Index",
+    variable == "CMR_Index_Readmission_Zero" ~ "CMR Mortality Index (Zero)",
+    variable == "CMR_Index_Readmission_NonZero" ~ "CMR Mortality Index (Non-Zero)",
+    variable == "CMR_Index_Mortality_Zero" ~ "CMR Mortality Index (Zero)",
+    variable == "CMR_Index_Mortality_NonZero" ~ "CMR Mortality Index (Non-Zero)",
     variable == "admission_HOSPITAL_score" ~ "HOSPITAL Score at Admission",
     variable == "admission_news_score" ~ "NEWS2 Score at Admission",
     variable == "age_at_encounter" ~ "Age",
