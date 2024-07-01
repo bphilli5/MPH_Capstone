@@ -6,13 +6,18 @@
 ###############################################################################
 
 #> Step 1: Recoding and variable selection
-#> Step 2: Defining independent variables
+#> Step 2: Defining independent variables for HOSPITAL and NEWS2 models 
 #> Step 3: Bivariate analysis
-#> Step 4: Collinearity of numeric predictors
-#> Step 5: Plotting of numeric predictors and outcomes
-#> Step 6: Creating simple additive models
-#> Step 7: Creating simple interaction models
-#> Step 8: Type III testing
+#> Step 4: Comparing methods of modeling scores
+#> Step 5: Bivariate analysis with payor category
+#> Step 6: Plotting of numeric predictors and outcomes
+#> Step 7: Assessing collinearity of numeric predictors
+#> Step 8: Creating simple additive models (fits_1)
+#> Step 9: Type III Testing of fits_1
+#> Step 10: Creating second set of models (fits_2)
+#> Step 11: Creating third set of models (fits_3)
+#> Step 12: Creating models with interaction terms (fits_i)
+#> Step 13: Model comparisons
 
 ###############################################################################
 # Step 1: Recoding and variable selection
@@ -161,10 +166,22 @@ d_analysis <- d_tables %>%
       NA
     }
   }) %>%
+  mutate(
+    CMR_Readmission_cat = case_when(
+      CMR_Index_Readmission < 0 ~ 0,
+      CMR_Index_Readmission == 0 ~ 1,
+      CMR_Index_Readmission > 0 ~ 2
+    ),
+    CMR_Mortality_cat = case_when(
+      CMR_Index_Mortality < 0 ~ 0,
+      CMR_Index_Mortality == 0 ~ 1,
+      CMR_Index_Mortality > 0 ~ 2
+    )
+  ) %>% 
   ungroup()
 
 ###############################################################################
-# Step 2: Defining independent variables for HOSPITAL and NEWS models 
+# Step 2: Defining independent variables for HOSPITAL and NEWS2 models 
 ###############################################################################
 all_variables <- names(d_analysis)
 outcome_variables <- names(d_analysis)[1:3]
@@ -210,7 +227,8 @@ bivariate_glm <- function(data, outcome, predictors) {
     formula <- as.formula(paste(outcome, "~", predictor))
     model <- glm(formula, data = data, family = binomial)
     results$model[[predictor]] <- tidy(model)[-1,c(1,2,5)]
-    results$lrt[[predictor]] <- tidy(anova(uni_model, model,test="LRT"))[-1,c(1,5,6)]
+    results$lrt[[predictor]] <- tidy(anova(uni_model, 
+                                           model,test="LRT"))[-1,c(1,5,6)]
   }
   return(results)
 }
@@ -242,26 +260,14 @@ readmission_table_lrt <- do.call(rbind, readmission_results$lrt)
 ed_table_lrt <- do.call(rbind, ed_results$lrt)
 death_table_lrt <- do.call(rbind, death_results$lrt)
 
-# Based on the results of the bivariate analysis, ICU_category can be removed
-# from models of readmission risk
-read_predictors <- read_predictors[-6]
-
-
-# Based on the results of bivariate analysis, NEWS2 doe not appear to be a 
-# significant predictor of ED readmission
-
-
-# Removing ethnicity as a predictor
-death_predictors <- death_predictors[-4]
-
 ###############################################################################
-# Step 5: Comparing methods of modeling scores
+# Step 4: Comparing methods of modeling scores
 ###############################################################################
-
-readmission_score_comps <- cbind(readmission_table_lrt[c(14:17,28:31),], # Numeric
-                                 readmission_table_lrt[c(19:22,33:36),], # Factor
-                                 readmission_table_lrt[c(23:26,37:40),], # Quantiles
-                                 readmission_table_lrt[c(18,27,32,41),] # Averages
+readmission_score_comps <- cbind(
+  readmission_table_lrt[c(14:17,28:31),], # Numeric
+  readmission_table_lrt[c(19:22,33:36),], # Factor
+  readmission_table_lrt[c(23:26,37:40),], # Quantiles
+  readmission_table_lrt[c(18,27,32,41),] # Averages
 )
 
 col_names_comps <- c("Nums", "Nums Dev", "Nums p",
@@ -278,9 +284,9 @@ readmission_score_comps <- readmission_score_comps[-c(4,7,10)] %>%
          )
 
 ed_score_comps <- cbind(ed_table_lrt[c(14:17,28:31),], # Numeric
-                                 ed_table_lrt[c(19:22,33:36),], # Factor
-                                 ed_table_lrt[c(23:26,37:40),], # Quantiles
-                                 ed_table_lrt[c(18,27,32,41),] # Averages
+                        ed_table_lrt[c(19:22,33:36),], # Factor
+                        ed_table_lrt[c(23:26,37:40),], # Quantiles
+                        ed_table_lrt[c(18,27,32,41),] # Averages
 )
 
 col_names_comps <- c("Nums", "Nums Dev", "Nums p",
@@ -315,14 +321,12 @@ death_score_comps <- death_score_comps[-c(4,7,10)] %>%
          across(c(3,5,7,9), ~round(.,4))
   )
 
-
 ###############################################################################
 # Step 5: Bivariate analysis with payor category
 ###############################################################################
 
 bivariate_analysis <- function(data, outcome, predictors) {
   results <- list()
-  
   for (predictor in predictors) {
     data_subset <- data %>% 
       filter(!is.na(!!sym(outcome)) & !is.na(!!sym(predictor)))
@@ -345,8 +349,10 @@ bivariate_analysis <- function(data, outcome, predictors) {
   return(results)
 }
 
+d_payor_filtered <- d_analysis %>% 
+  filter(d_analysis$payor_category_analysis %in% c("Medicare", "Medicaid", "Commercial"))
 # Usage
-payor_bivar <- bivariate_analysis(d_analysis, 
+payor_bivar <- bivariate_analysis(d_payor_filtered, 
                               "payor_category_analysis", 
                               c(predictors[-1],
                                 score_variables))
@@ -374,7 +380,7 @@ chi_square_table <- payor_bivar$chi_square %>%
 payor_bivariate_table <- rbind(chi_square_table,anova_table)
 
 ###############################################################################
-# Step 4: Plotting of numeric predictors and outcomes
+# Step 6: Plotting of numeric predictors and outcomes
 ###############################################################################
 # Function to iterate over predictors and plot numerics against outcomes
 plot_linear_association <- function(data, outcome, predictors) {
@@ -418,7 +424,7 @@ death_plot_grid <- grid.arrange(grobs=death_plots_test,
                                 top="30-Day death")
 
 
-
+#> DEPRECATED: Log transformations of numeric indicators
 # Log transformations
 # plot_log_association <- function(data, outcome, predictors) {
 #   results <- list()
@@ -461,7 +467,7 @@ death_plot_grid <- grid.arrange(grobs=death_plots_test,
 
 
 ###############################################################################
-# Step 5: Collinearity of numeric predictors
+# Step 7: Assessing collinearity of numeric predictors
 ###############################################################################
 
 # NEWS model collinearity
@@ -474,8 +480,6 @@ news_numeric_subset <- names(news_subset[, news_numeric_vars])
 news_correlation_matrix <- round(cor(d_analysis[news_numeric_subset], 
                                      use='pairwise.complete.obs'),3)
 
-
-
 # HOSPITAL model collinearity
 # Subset data
 hospital_subset <- d_analysis[, hospital_variables$variable]
@@ -486,10 +490,8 @@ hospital_numeric_subset <- hospital_subset[, hospital_numeric_vars]
 hospital_correlation_matrix <- round(cor(hospital_numeric_subset, 
                                          use='pairwise.complete.obs'),3)
 
-
-
 ###############################################################################
-# Step 5: Creating simple additive models
+# Step 8: Creating simple additive models (fits_1)
 ###############################################################################
 # Based on the results of the bivariate analysis and scoring comps, averages
 # and trend scores will be removed from the models
@@ -508,6 +510,7 @@ model_formulas_1 <- list(
                           paste(hospital_scores_1, collapse = " + "),
                           " + ",
                           paste(predictors_1, collapse = " + ")),
+# ED models have been removed based on the bivariate analysis
   # hospital_ed_visit <- paste0("ed_30days_recode_analysis ~ ",
   #                             paste(score_variables[1:5], collapse = " + "),
   #                             " + ",
@@ -535,12 +538,20 @@ fits_1 <- lapply(model_formulas_1, function(formula) {
   glm(formula, data = d_analysis, family = binomial)
 })
 
+fits_1_summary <- lapply(fits_1, function(fit) {
+  tidy(fit)
+})
+
+fits_1_aic <- lapply(fits_1, function(fit) {
+  fit$aic
+})
+
 fits_1_vifs <- lapply(fits_1, function(fit) {
   vif(fit)
 })
 
 ###############################################################################
-# Step 7: Type III Testing
+# Step 9: Type III Testing of fits_1
 ###############################################################################
 
 # Additive model type III testing
@@ -594,7 +605,8 @@ rownames(drop1_table_starred_1) <- table_row_names
 colnames(drop1_table_starred_1) <- table_column_names
 
 ###############################################################################
-# Applying drop1 resutls
+# Step 10: Creating second set of models (fits_2)
+###############################################################################
 
 hospital_scores_2 <- hospital_scores_1[c(1,4)]
 news_scores_2 <- news_scores_1[c(1,4)]
@@ -678,10 +690,9 @@ table_row_names <- c("Discharge Score",
 rownames(drop1_table_starred_2) <- table_row_names
 colnames(drop1_table_starred_2) <- table_column_names
 
-
-
 ###############################################################################
-# Third round of models
+# Step 11: Creating third set of models (fits_3)
+###############################################################################
 
 read_predictors <- predictors_1[-c(6,12)]
 death_predictors <- predictors[-12]
@@ -760,37 +771,9 @@ rownames(drop1_table_3_death_starred) <- c(hospital_scores_2, death_predictors)
 colnames(drop1_table_3_death_starred) <- c("HOSPITAL death", "NEWS death")
 
 ###############################################################################
-# Comparing the first and second models
-
-names(fits_1_aic) <- table_column_names
-names(fits_1_summary) <- table_column_names
-names(fits_2_aic) <- table_column_names
-names(fits_2_summary) <- table_column_names
-
-fits_1_2_aic <- data.frame(
-  AIC1 = unlist(fits_1_aic),
-  AIC2 = unlist(fits_2_aic)
-)
-
-fits_1_2_aic$delta <- fits_1_2_aic$AIC2 - fits_1_2_aic$AIC1
-
+# Step 12: Creating models with interaction terms (fits_i)
 ###############################################################################
-# Comparing the first and second models
 
-names(fits_1_aic) <- table_column_names
-names(fits_1_summary) <- table_column_names
-names(fits_2_aic) <- table_column_names
-names(fits_2_summary) <- table_column_names
-
-fits_1_2_aic <- data.frame(
-  AIC1 = unlist(fits_1_aic),
-  AIC2 = unlist(fits_2_aic)
-)
-
-fits_1_2_aic$delta <- fits_1_2_aic$AIC2 - fits_1_2_aic$AIC1
-
-###############################################################################
-# Fitting the interactive models
 hospital_scores_i <- hospital_scores_2
 news_scores_i <- news_scores_2
 read_predictors_i <- read_predictors
@@ -891,3 +874,64 @@ rownames(drop1_table_3_death_starred_i) <- c(hospital_scores_2[-1],
                                              death_predictors[-1],
                                              "*")
 colnames(drop1_table_3_death_starred_i) <- c("HOSPITAL death", "NEWS death")
+
+
+###############################################################################
+# Step 13: Model comparisons
+###############################################################################
+
+names(fits_1_vifs) <- table_column_names
+names(fits_1_aic) <- table_column_names
+names(fits_1_summary) <- table_column_names
+names(fits_2_aic) <- table_column_names
+names(fits_2_summary) <- table_column_names
+names(fits_3_aic) <- table_column_names
+names(fits_3_summary) <- table_column_names
+names(fits_i_aic) <- table_column_names
+names(fits_i_summary) <- table_column_names
+
+fits_1_2_aic <- data.frame(
+  AIC1 = unlist(fits_1_aic),
+  AIC2 = unlist(fits_2_aic),
+  AIC3 = unlist(fits_3_aic),
+  AICI = unlist(fits_i_aic)
+)
+
+
+# Function to extract coefficients and std errors for specified variables
+extract_coef_se <- function(fit_summary, variables) {
+  fit_summary %>%
+    filter(term %in% variables) %>%
+    select(term, estimate, std.error)
+}
+
+# Function to calculate percent change and add asterisks
+percent_change <- function(old, new) {
+  change <- (new - old) / old * 100
+  formatted <- sprintf("%.1f%%", change)
+  if (abs(change) > 20) {
+    formatted <- paste0(formatted, " ***")
+  }
+  formatted
+}
+
+# Create table for each model
+create_summary_table <- function(model_name, fits_1_summary, fits_2_summary, fits_3_summary) {
+  final_vars <- fits_3_summary[[model_name]]$term
+  
+  table <- extract_coef_se(fits_3_summary[[model_name]], final_vars) %>%
+    left_join(extract_coef_se(fits_2_summary[[model_name]], final_vars), by = "term", suffix = c("_3", "_2")) %>%
+    left_join(extract_coef_se(fits_1_summary[[model_name]], final_vars), by = "term") %>%
+    select(term, 
+           estimate_1 = estimate, std.error_1 = std.error, 
+           estimate_2, std.error_2, 
+           estimate_3, std.error_3) %>%
+    mutate(percent_change = map2_chr(estimate_2, estimate_3, ~percent_change(.x, .y)))
+  
+  return(table)
+}
+
+# Create tables for each model
+model_names <- c("HOSPITAL Readmission", "HOSPITAL Death", "NEWS Readmission", "NEWS Death")
+final_tables <- lapply(model_names, function(name) create_summary_table(name, fits_1_summary, fits_2_summary, fits_3_summary))
+names(final_tables) <- model_names
