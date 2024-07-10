@@ -7,10 +7,10 @@ output: html_document
 
 ```{r setup, include=F, message= F}
 knitr::opts_chunk$set(echo = F)
-# source("bphillips_capstone_setup.R")
-# source("bphillips_capstone_tables.R")
-# source("bphillips_capstone_aim1.R")
-# source("bphillips_capstone_aim2.R")
+source("bphillips_capstone_setup.R")
+source("bphillips_capstone_tables.R")
+source("bphillips_capstone_aim1.R")
+source("bphillips_capstone_aim2.R")
 ```
 
 ## Descriptive Statistic Tables
@@ -132,13 +132,13 @@ plot(death_plot_grid)
 
 Low scores producing much lower and higher odds of death for HOSPITAL and NEWS2 scores respectively is a counterintuitive result that will be explored later in the analysis.
 
-```{r}
+```{r hospital_correlation_matrix}
 # # View HOSPITAL correlation matrix
 hospital_correlation_matrix
 ```
 Relatively high correlations among several of the HOSPITAL scores is expected, but indicates that it is unlikely that they can all be included in a single model without variance inflation.
 
-```{r}
+```{r news_correlation_matrix}
 # View NEWS correlation matrix
 news_correlation_matrix
 ```
@@ -152,7 +152,7 @@ fits_1_vifs
 
 Initial models were fitted with all scores to determine the extent of variance inflation. While the variance inflation factors for NEWS2 scores are not high enough to warrant exclusion, those for HOSPITAL scores are. Therefore, the next round of models will include only discharge and admission scores.
 
-```{r}
+```{r drop1_table_starred_2}
 drop1_table_starred_2
 # drop1_table_starred_2[-c(4:7,15),]
 
@@ -160,22 +160,22 @@ drop1_table_starred_2
 
 
 
-```{r}
+```{r fits_2_summary_HRead}
 (fits_2_summary$`HOSPITAL Readmission` %>% 
   mutate(across(2:5, ~round(.,3))))
 ```
 
-```{r}
+```{r fits_2_summary_HDeath}
 (fits_2_summary$`HOSPITAL Death` %>% 
   mutate(across(2:5, ~round(.,3))))
 ```
 
-```{r}
+```{r fits_2_summary_NRead}
 (fits_2_summary$`NEWS Readmission` %>% 
   mutate(across(2:5, ~round(.,3))))
 ```
 
-```{r}
+```{r fits_2_summary_NDeath}
 (fits_2_summary$`NEWS Death` %>% 
   mutate(across(2:5, ~round(.,3))))
 ```
@@ -196,7 +196,7 @@ drop1_table_i_read_starred
 ```
 
 
-```{r}
+```{r drop1_table_3_death_starred_i}
 drop1_table_3_death_starred_i
 ```
 
@@ -209,11 +209,11 @@ print(ROC_summary_table)
 
 
 ```{r ROC_plot_grid}
-print(ROC_plot_grid)
+plot(ROC_plot_grid)
 ```
 
 
-```{r}
+```{r results_by_insurance_table}
 # Print summary tables and save plot grids for each insurance category
 for (insurance in insurance_categories) {
   cat("\nSummary Table for", insurance, "Insurance:\n")
@@ -221,15 +221,18 @@ for (insurance in insurance_categories) {
 }
 ```
 
-```{r}
-plot(plot_grids[["Commercial"]])
+```{r results_by_insurance_plot_Commercial}
+plot(roc_plot_grids[["Commercial"]])
+plot(cal_plot_grids[["Commercial"]])
 ```
 
-```{r}
-plot(plot_grids[["Medicare"]])
+```{r results_by_insurance_plot_Medicare}
+plot(roc_plot_grids[["Medicare"]])
+plot(cal_plot_grids[["Medicare"]])
 ```
 
-```{r}
-plot(plot_grids[["Medicaid"]])
+```{r results_by_insurance_plot_Medicaid}
+plot(roc_plot_grids[["Medicaid"]])
+plot(cal_plot_grids[["Medicaid"]])
 ```
 
