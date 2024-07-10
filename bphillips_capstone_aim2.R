@@ -61,14 +61,22 @@ cv_performance_extended <- function(formula, data, k = 10) {
 }
 
 # Function to create ROC plot
-create_roc_plot <- function(obs, preds, title) {
+create_roc_plot <- function(obs, preds, title, n_comparisons = 3) {
+  # Calculate Bonferroni-corrected confidence level
+  conf_level <- 1 - (0.05 / n_comparisons)
+  
   roc_obj <- roc(obs, preds)
+  ci <- ci.se(roc_obj, specificities = seq(0, 1, 0.01), conf.level = conf_level)
+  
   plot_data <- data.frame(
-    FPR = 1 - roc_obj$specificities,
-    TPR = roc_obj$sensitivities
+    FPR = 1 - as.numeric(rownames(ci)),
+    TPR = ci[, 2],
+    lower = ci[, 1],
+    upper = ci[, 3]
   )
   
   ggplot(plot_data, aes(x = FPR, y = TPR)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = "lightblue") +
     geom_line() +
     geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
     labs(title = title,
@@ -76,6 +84,40 @@ create_roc_plot <- function(obs, preds, title) {
          y = "True Positive Rate") +
     annotate("text", x = 0.75, y = 0.25, 
              label = paste("AUC =", round(auc(roc_obj), 3))) +
+    theme_minimal()
+}
+
+# Function to create calibration plots
+create_calibration_plot <- function(obs, preds, title, n_groups = 10) {
+  # Create a data frame with observed outcomes and predicted probabilities
+  cal_data <- data.frame(obs = obs, pred = preds)
+  
+  # Sort the data by predicted probabilities and divide into groups
+  cal_data <- cal_data[order(cal_data$pred),]
+  cal_data$group <- cut(seq(nrow(cal_data)), breaks = n_groups, labels = FALSE)
+  
+  # Calculate mean predicted and observed probabilities for each group
+  cal_summary <- cal_data %>%
+    group_by(group) %>%
+    summarise(
+      mean_pred = mean(pred),
+      mean_obs = mean(obs),
+      n = n()
+    )
+  
+  # Create the calibration plot
+  ggplot(cal_summary, aes(x = mean_pred, y = mean_obs)) +
+    geom_point(aes(size = n), alpha = 0.7) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+    geom_smooth(method = "loess", se = FALSE, color = "blue") +
+    coord_equal() +
+    xlim(0, 1) + ylim(0, 1) +
+    labs(
+      title = title,
+      x = "Predicted Probability",
+      y = "Observed Proportion",
+      size = "Group Size"
+    ) +
     theme_minimal()
 }
 
@@ -132,16 +174,37 @@ for (i in 1:4) {
   # With interaction
   roc_plots[[paste0(model_names[i], " (with interaction)")]] <- 
     create_roc_plot(results_with_interaction[[i]]$obs, results_with_interaction[[i]]$preds, 
-                    paste0(model_names[i], " (with interaction)"))
+                    paste0(model_names[i], " (with interaction)"), n_comparisons = 3)
   
   # Without interaction
   roc_plots[[paste0(model_names[i], " (without interaction)")]] <- 
     create_roc_plot(results_without_interaction[[i]]$obs, results_without_interaction[[i]]$preds, 
-                    paste0(model_names[i], " (without interaction)"))
+                    paste0(model_names[i], " (without interaction)"), n_comparisons = 3)
 }
 
 # Arrange plots in a grid
 ROC_plot_grid <- do.call(grid.arrange, c(roc_plots, ncol = 2))
+
+
+# Create calibration plots
+cal_plots <- list()
+
+for (i in 1:4) {
+  # With interaction
+  cal_plots[[paste0(model_names[i], " (with interaction)")]] <- 
+    create_calibration_plot(results_with_interaction[[i]]$obs, 
+                            results_with_interaction[[i]]$preds, 
+                            paste0(model_names[i], " (with interaction)"))
+  
+  # Without interaction
+  cal_plots[[paste0(model_names[i], " (without interaction)")]] <- 
+    create_calibration_plot(results_without_interaction[[i]]$obs, 
+                            results_without_interaction[[i]]$preds, 
+                            paste0(model_names[i], " (without interaction)"))
+}
+
+# Arrange calibration plots in a grid
+cal_plot_grid <- do.call(grid.arrange, c(cal_plots, ncol = 2))
 
 
 ################################################################################
@@ -200,7 +263,7 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
   roc_plots <- list()
   for (i in 1:4) {
     roc_plots[[model_names[i]]] <- 
-      create_roc_plot(results[[i]]$obs, results[[i]]$preds, model_names[i])
+      create_roc_plot(results[[i]]$obs, results[[i]]$preds, model_names[i], n_comparisons = 3)
   }
   
   # Arrange plots in a grid
@@ -210,7 +273,24 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
     top = textGrob(paste(insurance_category, "Insurance"), gp = gpar(fontsize = 20, fontface = "bold"))
   )
   
-  return(list(summary_table = summary_table, plot_grid = plot_grid))
+  # Create calibration plots
+  cal_plots <- list()
+  for (i in 1:4) {
+    cal_plots[[model_names[i]]] <- 
+      create_calibration_plot(results[[i]]$obs, results[[i]]$preds, model_names[i])
+  }
+  
+  # Arrange calibration plots in a grid
+  cal_plot_grid <- grid.arrange(
+    grobs = cal_plots,
+    ncol = 2,
+    top = textGrob(paste(insurance_category, "Insurance - Calibration"), 
+                   gp = gpar(fontsize = 20, fontface = "bold"))
+  )
+  
+  return(list(summary_table = summary_table, 
+              roc_plot_grid = plot_grid, 
+              cal_plot_grid = cal_plot_grid))
 }
 
 # Perform analysis for each insurance category
@@ -220,7 +300,12 @@ results_by_insurance <- lapply(insurance_categories, function(insurance) {
 names(results_by_insurance) <- insurance_categories
 
 # Print summary tables and store plot grids for each insurance category
-plot_grids <- list()
+roc_plot_grids <- list()
 for (insurance in insurance_categories) {
-  plot_grids[[insurance]] <- results_by_insurance[[insurance]]$plot_grid
+  roc_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$roc_plot_grid
+}
+
+cal_plot_grids <- list()
+for (insurance in insurance_categories) {
+  cal_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$cal_plot_grid
 }
