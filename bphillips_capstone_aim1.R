@@ -22,7 +22,7 @@
 ###############################################################################
 # Step 1: Recoding and variable selection
 ###############################################################################
-d_analysis <- d_tables %>% 
+d_analysis <- d_1 %>% 
   mutate(across(c(readmission_30days_recode,
                   ed_30days_recode,
                   death_30_days),
@@ -880,6 +880,9 @@ colnames(drop1_table_3_death_starred_i) <- c("HOSPITAL death", "NEWS death")
 # Step 13: Model comparisons
 ###############################################################################
 
+names(fits_1) <- table_column_names
+names(fits_2) <- table_column_names
+names(fits_3) <- table_column_names
 names(fits_1_vifs) <- table_column_names
 names(fits_1_aic) <- table_column_names
 names(fits_1_summary) <- table_column_names

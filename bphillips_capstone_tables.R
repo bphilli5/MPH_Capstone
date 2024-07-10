@@ -13,7 +13,7 @@
 # Step 1: Categorical variable recoding + variable selection 
 ###############################################################################
 
-d_tables <- d_sas %>% 
+d_1 <- d_sas %>% 
   mutate(across(c(ed_30days,
                   readmission_30days),
                 ~case_when(.=="N" ~ "No",
@@ -28,19 +28,7 @@ d_tables <- d_sas %>%
            ethnicity == "*Unspecified" ~ "Unknown",
            ethnicity == "" ~ "Unknown",
            TRUE ~ ethnicity),
-         # Process CMR indices
-         CMR_Index_Readmission_Zero = if_else(CMR_Index_Readmission == 0,
-                                              "Yes",
-                                              "No"),
-         CMR_Index_Readmission_NonZero = if_else(CMR_Index_Readmission > 0, 
-                                                 CMR_Index_Readmission, 
-                                                 NA_real_),
-         CMR_Index_Mortality_Zero = if_else(CMR_Index_Mortality == 0,
-                                            "Yes",
-                                            "No"),
-         CMR_Index_Mortality_NonZero = if_else(CMR_Index_Mortality > 0, 
-                                               CMR_Index_Mortality, 
-                                               NA_real_)) %>% 
+         ) %>% 
   
   select(
     # Outcomes
@@ -73,16 +61,29 @@ d_tables <- d_sas %>%
     age_at_encounter,
     los_in_hours,
     # Processed CMR indices
-    CMR_Index_Readmission_Zero,
-    CMR_Index_Readmission_NonZero,
-    CMR_Index_Mortality_Zero,
-    CMR_Index_Mortality_NonZero
+    CMR_Index_Readmission,
+    CMR_Index_Mortality
   ) %>% 
   
   filter(
     age_at_encounter < 110
   )
 
+d_tables <- d_1 %>% 
+  # Process CMR indices
+  mutate(CMR_Index_Readmission_Zero = if_else(CMR_Index_Readmission == 0,
+                                              "Yes",
+                                              "No"),
+         CMR_Index_Readmission_NonZero = if_else(CMR_Index_Readmission > 0, 
+                                                 CMR_Index_Readmission, 
+                                                 NA_real_),
+         CMR_Index_Mortality_Zero = if_else(CMR_Index_Mortality == 0,
+                                            "Yes",
+                                            "No"),
+         CMR_Index_Mortality_NonZero = if_else(CMR_Index_Mortality > 0, 
+                                               CMR_Index_Mortality, 
+                                               NA_real_)
+  )
 ###############################################################################
 # Step 2: Setting up the sorting of the tables
 ###############################################################################

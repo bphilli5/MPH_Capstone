@@ -1,15 +1,12 @@
 Overall
 
 Tables
-- Rework CMR indices to have proportion of zeros and non-zero figures
 
 Aim 1
-- Principal component analysis of scores
-- Maybe something payor bivariate
-- Dealing with small n - payor_cat crosstabs, auc, etc
+
 
 Aim 2
-
+- Confidence intervals for ROC curves with Bonferroni correction
 
 Report
 - Full walkthrough
