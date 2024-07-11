@@ -288,9 +288,19 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
                    gp = gpar(fontsize = 20, fontface = "bold"))
   )
   
+  # Create a list of observed values and predictions for each model
+  model_results <- lapply(seq_along(model_names), function(i) {
+    list(
+      obs = results[[i]]$obs,
+      preds = results[[i]]$preds
+    )
+  })
+  names(model_results) <- model_names
+  
   return(list(summary_table = summary_table, 
               roc_plot_grid = plot_grid, 
-              cal_plot_grid = cal_plot_grid))
+              cal_plot_grid = cal_plot_grid,
+              model_results = model_results))
 }
 
 # Perform analysis for each insurance category
@@ -301,11 +311,74 @@ names(results_by_insurance) <- insurance_categories
 
 # Print summary tables and store plot grids for each insurance category
 roc_plot_grids <- list()
-for (insurance in insurance_categories) {
-  roc_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$roc_plot_grid
-}
-
 cal_plot_grids <- list()
 for (insurance in insurance_categories) {
+  print(paste("Summary for", insurance, "Insurance:"))
+  print(results_by_insurance[[insurance]]$summary_table)
+  roc_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$roc_plot_grid
   cal_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$cal_plot_grid
 }
+
+
+
+################################################################################
+# Step 3: Comparing AUROCs across insurance categories
+################################################################################
+
+compare_aurocs <- function(results_by_insurance, model_name) {
+  insurance_categories <- names(results_by_insurance)
+  n_categories <- length(insurance_categories)
+  comparisons <- combn(n_categories, 2)
+  
+  results <- list()
+  
+  for (i in 1:ncol(comparisons)) {
+    cat1 <- insurance_categories[comparisons[1, i]]
+    cat2 <- insurance_categories[comparisons[2, i]]
+    
+    roc1 <- roc(results_by_insurance[[cat1]]$model_results[[model_name]]$obs, 
+                results_by_insurance[[cat1]]$model_results[[model_name]]$preds)
+    roc2 <- roc(results_by_insurance[[cat2]]$model_results[[model_name]]$obs, 
+                results_by_insurance[[cat2]]$model_results[[model_name]]$preds)
+    
+    test_result <- roc.test(roc1, roc2, method = "delong")
+    
+    results[[paste(cat1, "vs", cat2)]] <- list(
+      p_value = test_result$p.value,
+      auc_diff = as.numeric(test_result$estimate[1] - test_result$estimate[2])
+    )
+  }
+  
+  return(results)
+}
+
+# Apply this function to each model
+model_names <- c("HOSPITAL - Death", "NEWS2 - Death")
+
+auroc_comparisons <- lapply(model_names, function(model) {
+  compare_aurocs(results_by_insurance, model)
+})
+names(auroc_comparisons) <- model_names
+
+create_comparison_table <- function(auroc_comparisons) {
+  comparison_table <- data.frame()
+  
+  for (model in names(auroc_comparisons)) {
+    for (comparison in names(auroc_comparisons[[model]])) {
+      row <- data.frame(
+        Model = model,
+        Comparison = comparison,
+        AUC_Difference = auroc_comparisons[[model]][[comparison]]$auc_diff,
+        P_Value = auroc_comparisons[[model]][[comparison]]$p_value
+      )
+      comparison_table <- rbind(comparison_table, row)
+    }
+  }
+  
+  comparison_table$Significant <- ifelse(comparison_table$P_Value < 0.05, "*", "")
+  
+  return(comparison_table)
+}
+
+comparison_summary <- create_comparison_table(auroc_comparisons)
+print(comparison_summary)

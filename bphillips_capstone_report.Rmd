@@ -236,3 +236,10 @@ plot(roc_plot_grids[["Medicaid"]])
 plot(cal_plot_grids[["Medicaid"]])
 ```
 
+
+```{r comparison_summary}
+(comparison_summary %>% 
+  mutate(AUC_Difference = abs(round(AUC_Difference,3)),
+         P_Value = round(P_Value,3)))
+```
+
