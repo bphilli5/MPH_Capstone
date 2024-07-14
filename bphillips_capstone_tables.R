@@ -20,13 +20,14 @@ d_1 <- d_sas %>%
                            .=="Y" ~ "Yes",
                            .default=NULL),
                 .names="{.col}_recode"),
-         sex_recode = ifelse(sex == "", "Unknown", sex),
+         sex_recode = ifelse(sex == "" | sex == "Unknown", "Missing", sex),
          ethnicity_recode = case_when(
            ethnicity == "Hispanic, Latino/a, or Spanish Origin" ~ "Hispanic",
            ethnicity == "Non-Hispanic, Latino/a, or Spanish Origin" ~ "Non-Hispanic",
-           ethnicity == "Patient Unable to Answer" ~ "Unknown",
-           ethnicity == "*Unspecified" ~ "Unknown",
-           ethnicity == "" ~ "Unknown",
+           ethnicity == "Patient Unable to Answer" ~ "Missing",
+           ethnicity == "*Unspecified" ~ "Missing",
+           ethnicity == "Unknown" ~ "Missing",
+           ethnicity == "" ~ "Missing",
            TRUE ~ ethnicity),
          ) %>% 
   
@@ -270,7 +271,7 @@ combined_table["Overall"] <- c(
   overall_figures$age_at_encounter,
   overall_figures$sex_recode['Male'],
   overall_figures$sex_recode['Female'],
-  overall_figures$sex_recode['Unknown'],
+  overall_figures$sex_recode['Missing'],
   overall_figures$race_category['White or Caucasian'],
   overall_figures$race_category['Black or African American'],
   overall_figures$race_category['Asian'],
@@ -281,7 +282,7 @@ combined_table["Overall"] <- c(
   overall_figures$race_category['Missing'],
   overall_figures$ethnicity_recode['Hispanic'],
   overall_figures$ethnicity_recode['Non-Hispanic'],
-  overall_figures$ethnicity_recode['Unknown'],
+  overall_figures$ethnicity_recode['Missing'],
   overall_figures$language_category['English'],
   overall_figures$language_category['Spanish'],
   overall_figures$language_category['Other'],
@@ -356,3 +357,12 @@ names(final_table) <- c("Variable", "Value", "Overall (n=72,983)",
                        "Medicaid (n=13,214)", "Self-Pay (n=2,260)",
                        "Indigent Care (n=202)", "Other (n=3,867)",
                        "Missing (n=74)")
+
+final_table_short <- final_table[c(1,3,5,7:14),-2] %>% 
+  gt() %>% 
+  tab_header(
+    title = "Table 1: Descriptive Statistics of Outcome and Score Variables by Payor Category"
+  ) %>% 
+  tab_options(table.font.size = px(11))
+  
+write.csv(final_table_short, "final_table_short.csv", row.names = FALSE)
