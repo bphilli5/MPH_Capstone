@@ -29,6 +29,9 @@ d_1 <- d_sas %>%
            ethnicity == "Unknown" ~ "Missing",
            ethnicity == "" ~ "Missing",
            TRUE ~ ethnicity),
+         payor_category = case_when(
+           payor_category == "Indigent Care" ~ "Other",
+           TRUE ~ payor_category),
          ) %>% 
   
   select(
@@ -322,7 +325,7 @@ combined_table["Overall"] <- c(
   overall_figures$CMR_Index_Mortality_NonZero
 )
 
-final_table <- combined_table[,c(1,2,10,6,3,5,9,4,8,7)] %>% 
+final_table <- combined_table[,c(1,2,9,5,3,4,8,7,6)] %>% 
   mutate(variable = case_when(
     variable == "readmission_30days_recode" ~ "30-Day Readmission",
     variable == "ed_30days_recode" ~ "30-Day ED Readmission",
@@ -355,8 +358,7 @@ final_table <- combined_table[,c(1,2,10,6,3,5,9,4,8,7)] %>%
 names(final_table) <- c("Variable", "Value", "Overall (n=72,983)", 
                        "Medicare (n=36,100)", "Commercial (n=17,266)",
                        "Medicaid (n=13,214)", "Self-Pay (n=2,260)",
-                       "Indigent Care (n=202)", "Other (n=3,867)",
-                       "Missing (n=74)")
+                       "Other (n=4,069)", "Missing (n=74)")
 
 final_table_short <- final_table[c(1,3,5,7:14),-2] %>% 
   gt() %>% 
