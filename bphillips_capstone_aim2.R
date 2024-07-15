@@ -211,7 +211,7 @@ cal_plot_grid <- do.call(grid.arrange, c(cal_plots, ncol = 2))
 # Step 2: Subgroup analysis
 ################################################################################
 # Define insurance categories to analyze
-insurance_categories <- c("Commercial", "Medicare", "Medicaid")
+insurance_categories <- c("Commercial", "Medicare", "Medicaid", "Self-pay", "Other")
 
 # Redefine model formulas without payor status
 model_formulas_stratified <- list(
@@ -233,18 +233,71 @@ model_formulas_stratified <- list(
                       paste(death_predictors[-1], collapse = " + "))
 )
 
+
+combine_rare_levels <- function(data, var, min_freq = 0.05) {
+  freq <- table(data[[var]]) / nrow(data)
+  levels_to_keep <- names(freq)[freq >= min_freq]
+  data[[var]] <- factor(ifelse(data[[var]] %in% levels_to_keep, 
+                               as.character(data[[var]]), 
+                               "Other"))
+  return(data)
+}
+
+# Apply this to relevant categorical variables before running the analysis
+categorical_vars <- c("discharge_service_analysis", "race_category_analysis", 
+                      "language_category_analysis", "ICU_category_analysis", 
+                      "dc_disp_category_analysis", "patient_class_analysis", 
+                      "facility_name_analysis")
+
+k_subset <- 5
 # Function to perform analysis for a specific insurance category
 analyze_insurance_category <- function(insurance_category, d_analysis, model_formulas) {
   # Filter data for the specific insurance category
   d_filtered <- d_analysis %>% filter(payor_category_analysis == insurance_category)
-  
+  for (var in categorical_vars) {
+    d_filtered <- combine_rare_levels(d_filtered, var)
+  }
   # Apply the function to each of your models
-  model_names <- c("HOSPITAL - Readmission", "HOSPITAL - Death", 
-                   "NEWS2 - Readmission", "NEWS2 - Death")
+  results <- list()
   
-  results <- lapply(model_formulas, function(formula_str) {
-    cv_performance_extended(as.formula(formula_str), d_filtered, k=8)
-  })
+  for (model_name in seq_along(model_formulas)) {
+    k <- k_subset
+    success <- FALSE
+    
+    while (k >= 2 && !success) {
+      cat(sprintf("Insurance category: %s, Model: %s, k: %d\n", insurance_category, names(model_formulas)[model_name], k))
+      
+      result <- tryCatch({
+        cv_performance_extended(as.formula(model_formulas[[model_name]]), d_filtered, k = k)
+      }, error = function(e) {
+        cat(sprintf("Error occurred with k = %d. Error message: %s\n", k, e$message))
+        return(NULL)
+      })
+      
+      if (!is.null(result)) {
+        results[[model_name]] <- result
+        success <- TRUE
+        cat(sprintf("Successfully completed analysis for %s with k = %d\n", names(model_formulas)[model_name], k))
+      } else {
+        k <- k - 1
+        cat(sprintf("Reducing k to %d...\n", k))
+      }
+    }
+    
+    if (!success) {
+      cat(sprintf("Failed to run analysis for %s with insurance category %s\n", names(model_formulas)[model_name], insurance_category))
+      results[[model_name]] <- NULL
+    }
+  }
+  
+  # Remove NULL results
+  results <- results[!sapply(results, is.null)]
+  
+  # If all models failed, return NULL
+  if (length(results) == 0) {
+    cat(sprintf("All models failed for insurance category %s\n", insurance_category))
+    return(NULL)
+  }
   
   # Create summary table
   summary_table <- data.frame(
@@ -262,29 +315,29 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
   # Create ROC plots
   roc_plots <- list()
   for (i in 1:4) {
-    roc_plots[[model_names[i]]] <- 
+    roc_plots[[model_names[i]]] <-
       create_roc_plot(results[[i]]$obs, results[[i]]$preds, model_names[i], n_comparisons = 3)
   }
-  
+
   # Arrange plots in a grid
   plot_grid <- grid.arrange(
     grobs = roc_plots,
     ncol = 2,
     top = textGrob(paste(insurance_category, "Insurance"), gp = gpar(fontsize = 20, fontface = "bold"))
   )
-  
+
   # Create calibration plots
   cal_plots <- list()
   for (i in 1:4) {
-    cal_plots[[model_names[i]]] <- 
+    cal_plots[[model_names[i]]] <-
       create_calibration_plot(results[[i]]$obs, results[[i]]$preds, model_names[i])
   }
-  
+
   # Arrange calibration plots in a grid
   cal_plot_grid <- grid.arrange(
     grobs = cal_plots,
     ncol = 2,
-    top = textGrob(paste(insurance_category, "Insurance - Calibration"), 
+    top = textGrob(paste(insurance_category, "Insurance - Calibration"),
                    gp = gpar(fontsize = 20, fontface = "bold"))
   )
   
@@ -298,7 +351,7 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
   names(model_results) <- model_names
   
   return(list(summary_table = summary_table, 
-              roc_plot_grid = plot_grid, 
+              roc_plot_grid = plot_grid,
               cal_plot_grid = cal_plot_grid,
               model_results = model_results))
 }
@@ -307,6 +360,7 @@ analyze_insurance_category <- function(insurance_category, d_analysis, model_for
 results_by_insurance <- lapply(insurance_categories, function(insurance) {
   analyze_insurance_category(insurance, d_analysis, model_formulas_stratified)
 })
+
 names(results_by_insurance) <- insurance_categories
 
 # Print summary tables and store plot grids for each insurance category
@@ -318,8 +372,6 @@ for (insurance in insurance_categories) {
   roc_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$roc_plot_grid
   cal_plot_grids[[insurance]] <- results_by_insurance[[insurance]]$cal_plot_grid
 }
-
-
 
 ################################################################################
 # Step 3: Comparing AUROCs across insurance categories
@@ -368,7 +420,7 @@ create_comparison_table <- function(auroc_comparisons) {
       row <- data.frame(
         Model = model,
         Comparison = comparison,
-        AUC_Difference = auroc_comparisons[[model]][[comparison]]$auc_diff,
+        AUC_Difference = abs(auroc_comparisons[[model]][[comparison]]$auc_diff),
         P_Value = auroc_comparisons[[model]][[comparison]]$p_value
       )
       comparison_table <- rbind(comparison_table, row)
