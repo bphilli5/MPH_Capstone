@@ -360,11 +360,10 @@ names(final_table) <- c("Variable", "Value", "Overall (n=72,983)",
                        "Medicaid (n=13,214)", "Self-Pay (n=2,260)",
                        "Other (n=4,069)", "Missing (n=74)")
 
-final_table_short <- final_table[c(1,3,5,7:14),-2] %>% 
+final_table_short <- final_table[c(1,3,5,7:15),-2] %>% 
   gt() %>% 
   tab_header(
     title = "Table 1: Descriptive Statistics of Outcome and Score Variables by Payor Category"
   ) %>% 
   tab_options(table.font.size = px(11))
   
-write.csv(final_table_short, "final_table_short.csv", row.names = FALSE)
