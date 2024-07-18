@@ -21,6 +21,13 @@ Data cannot be accessed without permission from the University of Colorado IRB
 - Subgroup analysis by insurance category
 - Model performance evaluation using AUROC, Brier scores, sensitivity, specificity, PPV, and NPV
 
+## Repo Structure
+- ~setup.R - Data ingestion and packages
+- ~tables.R - Produces descriptive statistic tables
+- ~aim1.R - Assesses the primary objective of the analysis
+- ~aim2.R - Assesses the secondary objective of the analysis
+- ~report.Rmd - Outputs significant analyses for easier interpretation
+
 ## Key Findings
 - TBD
 
