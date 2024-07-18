@@ -13,6 +13,7 @@ The study uses data from UCHealth hospitals in Colorado for the year 2021, inclu
 - Insurance status
 - HOSPITAL and NEWS2 scores
 - 30-day readmission and mortality outcomes
+Data cannot be accessed without permission from the University of Colorado IRB
 
 ## Methods
 - Retrospective cohort study
