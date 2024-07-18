@@ -1,4 +1,4 @@
-# Impact of Insurance Status on Hospital Readmission and Mortality Risk Prediction
+# Impact of Insurance Status on Hospital Readmission and Mortality Risk Prediction - MPH Capstone Project
 
 ## Overview
 This project analyzes the performance of HOSPITAL and NEWS2 scores in predicting 30-day readmission and mortality across different insurance categories. It aims to evaluate whether these widely used risk prediction models perform consistently across diverse patient populations, with a focus on insurance status as a proxy for socio-economic factors and healthcare access.
