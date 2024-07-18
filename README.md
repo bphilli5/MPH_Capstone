@@ -29,7 +29,9 @@ Data cannot be accessed without permission from the University of Colorado IRB
 - ~report.Rmd - Outputs significant analyses for easier interpretation
 
 ## Key Findings
-- TBD
+- Tests for interaction between insurance status and physiological scores were not significant, but insurance status was a significant covariate, indicating that scores are equally valid for prediction after adjusting for insurance status
+- Models were well-calibrated for predicting mortality (AUROC > 0.8), but not readmission (0.7 > AUROC > 0.6) indicating that the scores are useful for mortality, but not readmission
+- Stratified analysis suggested that the predictive validity of scores was significantly higher among patients with private insurance or Medicare compared to uninsured patients. Patients with Medicaid also showed lower AUROC, but not significant
 
 ## Contributors
 - Brendan Phillips
